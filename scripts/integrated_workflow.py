@@ -311,7 +311,7 @@ class IntegratedWorkflow:
                     print(f"      ⚠️  Google Sheets logging failed")
             
             # Step 7: Save email metadata locally
-            self._save_email_metadata(email_folder, email, attachment, dropbox_path, extracted_amount, due_date, local_file_path.name)
+            # Disabled: self._save_email_metadata(email_folder, email, attachment, dropbox_path, extracted_amount, due_date, local_file_path.name)
             
             print(f"      🎉 Completed processing: {filename}")
             return True
