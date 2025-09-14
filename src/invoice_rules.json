@@ -1,0 +1,364 @@
+{
+  "rules": [
+    {
+      "name": "Danubius Expert",
+      "description": "Accounting invoice from Danubius Expert",
+      "email_patterns": [
+        "szamlakuldes@danubiusexpert.hu"
+      ],
+      "subject_patterns": [
+        "könyvelési díj számla küldése",
+        "számla",
+        "invoice"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Könyvelés",
+      "sheet_description": "Könyvelési díj - Danubius Expert",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Összesen:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Végösszeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Fizetendő:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Total:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Esedékesség:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "cleango",
+      "description": "Car wash service from cleango",
+      "email_patterns": [
+        "info@cleango.hu"
+      ],
+      "subject_patterns": [
+        "mosásod elkészült",
+        "mosás",
+        "számla",
+        "invoice"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "cleango",
+      "sheet_description": "Autómosás - Cleango",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Összesen:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Végösszeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Fizetendő:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Total:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Összesen:\\s*\\n\\s*(\\d+(?:\\s\\d{3})*(?:\\s\\d{2,3})?(?:,\\d{2})?)\\s*HUF",
+          "(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "Bruttó ár\\s+(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Bruttó:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "végösszeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "összeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Ár:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Áfa\\s*nélkül:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "(\\d+(?:,\\d{3})*\\.\\d{2})\\s*Ft",
+          "(\\d{1,6},\\d{2})\\s*Ft",
+          "(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fizetésihatáridő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Esedékesség:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Teljesítésdátuma:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Kiállításdátuma:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Schönherz Iskolaszövetkezet",
+      "description": "Student cooperative services",
+      "email_patterns": [
+        "schonherzsz@szamlazz.hu"
+      ],
+      "subject_patterns": [
+        "Számlaértesítő - Schönherz Iskolaszövetkezet",
+        "Számlaértesítő",
+        "Schönherz",
+        "számla"
+      ],
+      "pdf_filename_patterns": [
+        "E-SCHNH-",
+        "SCHNH-"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Schonherz",
+      "sheet_description": "Diákszövetkezet - Schönherz",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Összesen:\\s*\\n\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft",
+          "Összesen:\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft",
+          "Végösszeg:\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft", 
+          "Fizetendő:\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft",
+          "Összesen:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Végösszeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Fizetendő:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "Total:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "(\\d+(?:\\s\\d{3})+)\\s*Ft",
+          "(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fizetésihatáridő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Esedékesség:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Teljesítésdátuma:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Kiállításdátuma:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Számla kelte:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Whitehouse Centre Kft",
+      "description": "Office space rental from Spaces",
+      "email_patterns": [
+        "reception.whitehouse@spacesworks.com"
+      ],
+      "subject_patterns": [
+        "Spaces invoice",
+        "spaces invoice",
+        "invoice"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Spaces",
+      "sheet_description": "Irodabérlet - Spaces",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Fizetendő\\s+(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "Fizetendő\\s*(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "Fizetendő:\\s*(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "Fizetendő\\s+(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)",
+          "Fizetendő:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)",
+          "Összesen:\\s*(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "Végösszeg:\\s*(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "Total:\\s*(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "(\\d+(?:\\s\\d{3})+)\\s*HUF",
+          "(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fiz\\.\\s*határidő\\s+(\\d{1,2})/(\\d{1,2})/(\\d{4})",
+          "Fizetésihatáridő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Esedékesség:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Teljesítésdátuma:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Kiállításdátuma:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Számla kelte:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Google Workspace",
+      "description": "Google Workspace subscription",
+      "email_patterns": [
+        "payments-noreply@google.com"
+      ],
+      "subject_patterns": [
+        "Google Workspace: Your invoice is available",
+        "Google Workspace",
+        "invoice is available"
+      ],
+      "invoice_type": "kiadas_penztár",
+      "payment_type": "Saját",
+      "filename_prefix": "Google",
+      "sheet_description": "Google Workspace előfizetés",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [],
+        "eur_extraction": {
+          "pdf_patterns": [
+            "€(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?)",
+            "(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?)\\s*€",
+            "Total in EUR\\s*€(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?)"
+          ]
+        },
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Due Date:\\s*(\\d{4})/(\\d{1,2})/(\\d{1,2})",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Microsoft Office 365",
+      "description": "Microsoft Office 365 Developer subscription",
+      "email_patterns": [
+        "microsoft-noreply@microsoft.com"
+      ],
+      "subject_patterns": [
+        "View your Office 365 E3 Developer invoice",
+        "Office 365",
+        "Developer invoice"
+      ],
+      "invoice_type": "kiadas_penztár",
+      "payment_type": "Saját",
+      "filename_prefix": "Microsoft",
+      "sheet_description": "Microsoft Office 365 előfizetés",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Total Charges \\(including VAT\\)\\s+(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "Total Charges \\(including VAT\\)\\s+(\\d+(?:\\s\\d{3})*(?:\\.\\d{2})?)\\s*HUF",
+          "Total Charges:\\s*(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "Total:\\s*(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "(\\d+(?:\\s\\d{3})*(?:\\.\\d{2})?)\\s*HUF"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Due Date:\\s*(\\d{4})/(\\d{1,2})/(\\d{1,2})",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Bérszámfejtés",
+      "description": "Payroll processing invoices with multiple PDFs",
+      "email_patterns": [
+        "proka.norbert@starttax.hu"
+      ],
+      "subject_patterns": [
+        "bérszámfejtés"
+      ],
+      "body_patterns": [
+        "bérszámfejtés"
+      ],
+      "pdf_count_required": 3,
+      "save_all_attachments": true,
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Berszamfejtes",
+      "sheet_description": "Bérszámfejtés - Payroll",
+      "folder_override": "berszamfejtes",
+      "table_extraction": {
+        "files": ["Adoesjarulekbefizetesek*.pdf", "Bankiutalasok*.pdf"],
+        "table_patterns": {
+          "Adoesjarulekbefizetesek": {
+            "start_marker": "Adó és járulék befizetések",
+            "end_marker": "Összesen",
+            "column_patterns": [
+              "([A-ZÁÉÍÓÖŐÚÜŰa-záéíóöőúüű\\s,]+)\\s+(\\d{3})\\s+(\\d{8}-\\d{8})\\s+([\\d\\s]+)"
+            ]
+          },
+          "Bankiutalasok": {
+            "start_marker": "Bank utalások",
+            "end_marker": "Összesen",
+            "column_patterns": [
+              "([A-ZÁÉÍÓÖŐÚÜŰa-záéíóöőúüű\\s,]+)\\s+(\\d{3})\\s+(\\d{8}-\\d{8})\\s+([\\d\\s]+)"
+            ]
+          }
+        }
+      },
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Összesen\\s+(\\d+(?:\\s\\d{3})*)",
+          "Összesen\\s+(\\d{1,3}(?:\\s\\d{3})+)"
+        ],
+        "email_patterns": []
+      }
+    }
+  ],
+  "exclusion_rules": [
+    {
+      "name": "Atlassian Invoices",
+      "description": "Exclude Atlassian payment confirmations", 
+      "email_patterns": [
+        "no_reply@am.atlassian.com"
+      ],
+      "subject_patterns": [
+        "Your payment has been processed",
+        "payment has been processed"
+      ]
+    },
+    {
+      "name": "Non-Payroll Tax Documents",
+      "description": "Exclude tax documents that are not payroll related",
+      "email_patterns": [
+        "proka.norbert@starttax.hu"
+      ],
+      "subject_patterns": [
+        "Iparűzési adók",
+        "határozat",
+        "kifizető helyi igazolás"
+      ]
+    }
+  ],
+  "default_rule": {
+    "name": "Unknown Invoice",
+    "invoice_type": "kiadas_vallalati",
+    "payment_type": "Vállalati számla",
+    "amount_extraction": {
+      "method": "both",
+      "email_patterns": [
+        "(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)",
+        "\\$([0-9,]+\\.\\d{2})",
+        "€([0-9,]+\\.\\d{2})"
+      ],
+      "pdf_patterns": [
+        "Összesen:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+        "Total:\\s*\\$([0-9,]+\\.\\d{2})",
+        "Amount:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*HUF"
+      ]
+    }
+  },
+  "settings": {
+    "base_folder": "/Users/tothi/Downloads/testinvoicecopy",
+    "current_year": 2025,
+    "folder_structure": {
+      "kiadas_penztár": "expenses_personal",
+      "kiadas_vallalati": "expenses_business", 
+      "bevetel_vallalati": "income_business",
+      "berszamfejtes": "berszamfejtes"
+    },
+    "google_sheets": {
+      "spreadsheet_id": "19jOXzcfCVgzYflXa_XAXNDfxANiQraQD-MFvrmnazDI",
+      "worksheet_template": "{year}",
+      "columns": {
+        "kiadas_vallalati": {"target": "Kiadás HUF"},
+        "kiadas_penztár": {"target": "Kiadás HUF"},
+        "bevetel_vallalati": {"target": "Bevétel HUF"}
+      }
+    }
+  }
+}
