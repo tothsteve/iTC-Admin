@@ -148,25 +148,11 @@ class IntegratedWorkflow:
             print(f"   💰 Invoice Type: {classification.invoice_type}")
             print(f"   📁 Folder: {classification.folder_path}")
             
-            # Create downloads directory
-            downloads_dir = Path("downloads")
-            downloads_dir.mkdir(exist_ok=True)
-            
-            # Create folder structure based on classification
-            year = datetime.now().year
-            partner_folder = downloads_dir / str(year) / classification.folder_path
-            partner_folder.mkdir(parents=True, exist_ok=True)
-            
-            # Create specific folder for this email
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            email_folder = partner_folder / f"{timestamp}_{email['id'][:8]}"
-            email_folder.mkdir(exist_ok=True)
-            
             # Process each PDF attachment (with filename filtering if specified)
             for attachment in email.get('pdf_attachments', []):
                 # Check if this PDF should be processed based on filename patterns
                 if self._should_process_pdf(attachment['filename'], classification):
-                    success = await self.process_single_attachment(email, attachment, email_folder, classification)
+                    success = await self.process_single_attachment(email, attachment, classification)
                     if not success:
                         print(f"   ⚠️  Failed to process attachment: {attachment['filename']}")
                 else:
@@ -178,7 +164,7 @@ class IntegratedWorkflow:
             print(f"   ❌ Error processing email: {e}")
             return False
     
-    async def process_single_attachment(self, email: dict, attachment: dict, email_folder: Path, classification) -> bool:
+    async def process_single_attachment(self, email: dict, attachment: dict, classification) -> bool:
         """Process a single PDF attachment through the complete workflow."""
         filename = attachment['filename']
         correlation_id = str(uuid.uuid4())[:8]
@@ -198,8 +184,22 @@ class IntegratedWorkflow:
                 await self._log_processing_error(email, attachment, "Failed to download from Gmail")
                 return False
             
-            # Step 2: Save locally with temporary name first
-            temp_file_path = email_folder / filename
+            # Step 2: Save directly to final Dropbox location
+            # Create target folder based on classification
+            year = datetime.now().year
+            dropbox_folder = Path(self.dropbox_client.settings.dropbox_sync_folder)
+            
+            if hasattr(classification, 'folder_override') and classification.folder_override == "berszamfejtes":
+                # Special handling for bérszámfejtés: /ITCardigan/Cégiratok/Berpapirok/2025/08/
+                month_num = self._extract_month_from_filename(filename, email)
+                target_folder = dropbox_folder / "Cégiratok" / "Berpapirok" / str(year) / f"{month_num:02d}"
+            else:
+                # Regular invoices: /ITCardigan/2025/Bejövő or /ITCardigan/2025/Pénztár
+                target_folder = dropbox_folder / str(year) / classification.folder_path
+                
+            target_folder.mkdir(parents=True, exist_ok=True)
+            temp_file_path = target_folder / filename
+            
             with open(temp_file_path, 'wb') as f:
                 f.write(attachment_data)
             
@@ -249,19 +249,9 @@ class IntegratedWorkflow:
             local_file_path = self._rename_file_with_prefixes(temp_file_path, classification, due_date)
             print(f"      📝 Renamed to: {local_file_path.name}")
             
-            # Step 5: Copy to local Dropbox folder
-            print(f"      3. Copying to Dropbox folder...")
-            email_data = {
-                'gmail_message_id': email['id'],
-                'sender_email': email['sender'],
-                'subject': email['subject']
-            }
-            
-            dropbox_path = await self.dropbox_client.copy_pdf(local_file_path, email_data)
-            if dropbox_path:
-                print(f"      ✅ Copied to Dropbox: {dropbox_path}")
-            else:
-                print(f"      ⚠️  Dropbox copy failed")
+            # Step 5: File is already in final location, just set the path
+            dropbox_path = str(local_file_path)
+            print(f"      ✅ File ready in: {dropbox_path}")
             
             # Step 6: Log to Google Sheets with extracted data
             print(f"      4. Logging to Google Sheets...")
@@ -484,8 +474,16 @@ class IntegratedWorkflow:
                         break
             
             # Build new filename: YYYYMMDD_prefix_original_filename
+            # Exception: for bérszámfejtés files, keep original filename without date prefix
             original_name = original_path.name
-            new_name = f"{due_date}_{rule_prefix}_{original_name}"
+            
+            if classification.folder_override == "berszamfejtes":
+                # For bérszámfejtés files, keep original filename
+                new_name = original_name
+            else:
+                # For regular invoices, add date and rule prefix
+                new_name = f"{due_date}_{rule_prefix}_{original_name}"
+                
             new_path = original_path.parent / new_name
             
             # Rename the file
@@ -548,6 +546,48 @@ class IntegratedWorkflow:
             if renamed_filename:
                 f.write(f"Renamed File: {renamed_filename}\\n")
             f.write(f"\\nProcessing Status: {'COMPLETED' if dropbox_path else 'PARTIAL'}\\n")
+    
+    def _extract_month_from_filename(self, filename: str, email: dict) -> int:
+        """Extract month number from filename or email date for bérszámfejtés files."""
+        import re
+        from datetime import datetime
+        
+        # Hungarian month names mapping
+        hungarian_months = {
+            'januar': 1, 'februor': 2, 'marzius': 3, 'aprilis': 4,
+            'majus': 5, 'junius': 6, 'julius': 7, 'augusztus': 8,
+            'szeptember': 9, 'oktober': 10, 'november': 11, 'december': 12
+        }
+        
+        filename_lower = filename.lower()
+        
+        # Try to extract month from filename
+        for month_name, month_num in hungarian_months.items():
+            if month_name in filename_lower:
+                return month_num
+        
+        # Try to extract from patterns like "2025Augusztus"
+        for month_name, month_num in hungarian_months.items():
+            pattern = rf'2025{month_name}'
+            if re.search(pattern, filename_lower):
+                return month_num
+        
+        # Fallback to email date or current month - 1 (since payroll is usually for previous month)
+        try:
+            # Parse email date and get previous month
+            email_date = email.get('date', '')
+            if email_date:
+                # Parse email date format like "Thu, 4 Sep 2025 03:17:48 +0000"
+                parsed_date = datetime.strptime(email_date.split(' +')[0], '%a, %d %b %Y %H:%M:%S')
+                # Payroll is usually for previous month
+                prev_month = parsed_date.month - 1 if parsed_date.month > 1 else 12
+                return prev_month
+        except:
+            pass
+            
+        # Final fallback: current month - 1
+        current_month = datetime.now().month
+        return current_month - 1 if current_month > 1 else 12
     
     async def _log_processing_error(self, email: dict, attachment: dict, error_message: str):
         """Log processing error to Google Sheets."""

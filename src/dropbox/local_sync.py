@@ -47,7 +47,8 @@ class LocalDropboxManager:
     async def copy_pdf(
         self, 
         local_file_path: Path, 
-        email_data: Dict[str, Any]
+        email_data: Dict[str, Any],
+        classification = None
     ) -> Optional[str]:
         """
         Copy PDF to local Dropbox folder and return the path.
@@ -60,8 +61,16 @@ class LocalDropboxManager:
             Relative path to the copied file or None if failed
         """
         try:
-            # Copy directly to the Dropbox sync folder (no subfolders)
-            target_file_path = self.dropbox_folder / local_file_path.name
+            # Create target folder based on classification
+            if classification:
+                from datetime import datetime
+                year = datetime.now().year
+                target_folder = self.dropbox_folder / str(year) / classification.folder_path
+                target_folder.mkdir(parents=True, exist_ok=True)
+                target_file_path = target_folder / local_file_path.name
+            else:
+                # Fallback to root folder if no classification
+                target_file_path = self.dropbox_folder / local_file_path.name
             
             # Handle duplicate filenames
             counter = 1
@@ -176,12 +185,6 @@ class LocalDropboxManager:
             # Create main folder
             self.dropbox_folder.mkdir(parents=True, exist_ok=True)
             logger.info(f"Created main folder: {self.dropbox_folder}")
-            
-            # Create monthly subfolder
-            current_month = datetime.now().strftime('%Y-%m')
-            monthly_folder = self.dropbox_folder / current_month
-            monthly_folder.mkdir(exist_ok=True)
-            logger.info(f"Created monthly folder: {monthly_folder}")
             
             return True
             

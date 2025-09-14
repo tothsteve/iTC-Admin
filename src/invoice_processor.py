@@ -23,6 +23,7 @@ class InvoiceClassification:
     currency: str = "HUF"
     confidence: float = 0.0
     matched_patterns: List[str] = field(default_factory=list)  # Which patterns matched
+    folder_override: Optional[str] = None
 
 class InvoiceRulesEngine:
     """Engine for processing invoices based on configurable rules"""
@@ -151,7 +152,8 @@ class InvoiceRulesEngine:
             payment_type=rule.get('payment_type', 'Vállalati számla'),
             folder_path=folder_path,
             confidence=confidence,
-            matched_patterns=matched_patterns
+            matched_patterns=matched_patterns,
+            folder_override=rule.get('folder_override')
         )
         
         logger.info(f"📋 Classified email as: {rule_name} ({classification.invoice_type}) - confidence: {confidence:.2f}")

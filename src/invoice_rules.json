@@ -343,13 +343,13 @@
     }
   },
   "settings": {
-    "base_folder": "/Users/tothi/Downloads/testinvoicecopy",
+    "base_folder": "/Users/tothi/Dropbox/ITCardigan",
     "current_year": 2025,
     "folder_structure": {
-      "kiadas_penztár": "expenses_personal",
-      "kiadas_vallalati": "expenses_business", 
+      "kiadas_penztár": "Pénztár",
+      "kiadas_vallalati": "Bejövő", 
       "bevetel_vallalati": "income_business",
-      "berszamfejtes": "berszamfejtes"
+      "berszamfejtes": "Cégiratok/Berpapirok"
     },
     "google_sheets": {
       "spreadsheet_id": "19jOXzcfCVgzYflXa_XAXNDfxANiQraQD-MFvrmnazDI",
