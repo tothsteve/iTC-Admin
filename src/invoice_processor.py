@@ -281,8 +281,14 @@ class InvoiceRulesEngine:
                 matches = re.findall(pattern, pdf_text, re.IGNORECASE | re.MULTILINE)
                 if matches:
                     amount_str = matches[0]
-                    # Clean up European number format: 32.40 -> 32.40
-                    amount_str = amount_str.replace(',', '')  # Remove thousands separators if any
+
+                    # Special handling for Anthropic spaced format: "1 8 . 0 0" -> "18.00"
+                    if re.match(r'^\d\s+\d\s*\.\s*\d\s+\d$', amount_str):
+                        amount_str = re.sub(r'\s+', '', amount_str)  # Remove all spaces
+                    else:
+                        # Standard European number format: 32.40 -> 32.40
+                        amount_str = amount_str.replace(',', '')  # Remove thousands separators if any
+
                     eur_amount = float(amount_str)
                     logger.info(f"💶 Extracted EUR amount: {eur_amount}")
                     return eur_amount
@@ -420,32 +426,66 @@ class InvoiceRulesEngine:
                     if len(match) == 3:
                         # Could be YYYY-MM-DD, DD-MM-YYYY, or MM/DD/YYYY format
                         part1, part2, part3 = match
-                        
-                        # Check if first part is year (4 digits)
-                        if len(part1) == 4:  # YYYY-MM-DD format
-                            year, month, day = part1, part2, part3
-                        elif len(part3) == 4:  # Either DD-MM-YYYY or MM/DD/YYYY format
-                            # Check if we can determine which format based on values
-                            # If part1 > 12, it's likely DD-MM-YYYY
-                            # If part1 <= 12 and part2 > 12, it's likely MM/DD/YYYY
-                            if int(part1) > 12:  # DD-MM-YYYY format
-                                day, month, year = part1, part2, part3
-                            elif int(part2) > 12:  # MM/DD/YYYY format
-                                month, day, year = part1, part2, part3
+
+                        # Special handling for month name formats
+                        if classification and (classification.partner_name == "Anthropic" or classification.partner_name == "Google Workspace"):
+                            if classification.partner_name == "Anthropic" and ' ' in part1:
+                                # Anthropic spaced format: ("A u g u s t", "2 4", "2 0 2 5")
+                                month_name = re.sub(r'\s+', '', part1)  # "A u g u s t" -> "August"
+                                day = re.sub(r'\s+', '', part2)         # "2 4" -> "24"
+                                year = re.sub(r'\s+', '', part3)        # "2 0 2 5" -> "2025"
+                            elif classification.partner_name == "Google Workspace":
+                                # Google standard format: ("Aug", "31", "2025")
+                                month_name = part1  # "Aug"
+                                day = part2         # "31"
+                                year = part3        # "2025"
                             else:
-                                # Ambiguous case - try MM/DD/YYYY first for Spaces invoices
-                                # since the pattern order puts MM/DD/YYYY pattern first
-                                month, day, year = part1, part2, part3
+                                month_name = day = year = None
+
+                            if month_name and day and year:
+                                # Convert month name to number (handle both full and abbreviated names)
+                                month_map = {
+                                    'January': '01', 'Jan': '01', 'February': '02', 'Feb': '02',
+                                    'March': '03', 'Mar': '03', 'April': '04', 'Apr': '04',
+                                    'May': '05', 'June': '06', 'Jun': '06', 'July': '07', 'Jul': '07',
+                                    'August': '08', 'Aug': '08', 'September': '09', 'Sep': '09',
+                                    'October': '10', 'Oct': '10', 'November': '11', 'Nov': '11',
+                                    'December': '12', 'Dec': '12'
+                                }
+                                month = month_map.get(month_name, None)
+                                if month:
+                                    try:
+                                        date_obj = datetime(int(year), int(month), int(day))
+                                        return date_obj.strftime("%Y%m%d")
+                                    except ValueError:
+                                        continue
                         else:
-                            # Default fallback
-                            day, month, year = part1, part2, part3
-                        
-                        try:
-                            # Validate and format date
-                            date_obj = datetime(int(year), int(month), int(day))
-                            return date_obj.strftime("%Y%m%d")
-                        except ValueError:
-                            continue
+                            # Standard date format handling
+                            # Check if first part is year (4 digits)
+                            if len(part1) == 4:  # YYYY-MM-DD format
+                                year, month, day = part1, part2, part3
+                            elif len(part3) == 4:  # Either DD-MM-YYYY or MM/DD/YYYY format
+                                # Check if we can determine which format based on values
+                                # If part1 > 12, it's likely DD-MM-YYYY
+                                # If part1 <= 12 and part2 > 12, it's likely MM/DD/YYYY
+                                if int(part1) > 12:  # DD-MM-YYYY format
+                                    day, month, year = part1, part2, part3
+                                elif int(part2) > 12:  # MM/DD/YYYY format
+                                    month, day, year = part1, part2, part3
+                                else:
+                                    # Ambiguous case - try MM/DD/YYYY first for Spaces invoices
+                                    # since the pattern order puts MM/DD/YYYY pattern first
+                                    month, day, year = part1, part2, part3
+                            else:
+                                # Default fallback
+                                day, month, year = part1, part2, part3
+
+                            try:
+                                # Validate and format date
+                                date_obj = datetime(int(year), int(month), int(day))
+                                return date_obj.strftime("%Y%m%d")
+                            except ValueError:
+                                continue
                 else:
                     # Single match - try to parse as date
                     try:

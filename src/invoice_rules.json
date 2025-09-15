@@ -146,6 +146,9 @@
         "spaces invoice",
         "invoice"
       ],
+      "pdf_filename_patterns": [
+        "SZLA-"
+      ],
       "invoice_type": "kiadas_vallalati",
       "payment_type": "Vállalati számla",
       "filename_prefix": "Spaces",
@@ -210,6 +213,7 @@
       },
       "due_date_extraction": {
         "pdf_patterns": [
+          "([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
           "Due Date:\\s*(\\d{4})/(\\d{1,2})/(\\d{1,2})",
           "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
           "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
@@ -248,6 +252,45 @@
           "Due Date:\\s*(\\d{4})/(\\d{1,2})/(\\d{1,2})",
           "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
           "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Anthropic",
+      "description": "Anthropic AI service invoices",
+      "email_patterns": [
+        "invoice+statements@mail.anthropic.com"
+      ],
+      "subject_patterns": [
+        "Your receipt from Anthropic, PBC",
+        "receipt from Anthropic",
+        "Anthropic, PBC"
+      ],
+      "pdf_filename_patterns": [
+        "Invoice-"
+      ],
+      "exclude_filename_patterns": [
+        "Receipt-"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Claude",
+      "sheet_description": "AI szolgáltatás - Anthropic",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [],
+        "eur_extraction": {
+          "pdf_patterns": [
+            "€\\s*(\\d\\s*\\d\\s*\\.\\s*\\d\\s*\\d)\\s+d\\s*u\\s*e",
+            "A\\s*m\\s*o\\s*u\\s*n\\s*t\\s+d\\s*u\\s*e\\s*€\\s*(\\d\\s*\\d\\s*\\.\\s*\\d\\s*\\d)"
+          ]
+        },
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "D\\s*a\\s*t\\s*e\\s+d\\s*u\\s*e\\s*([A-Za-z\\s]+?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
+          "€\\s*\\d\\s*\\d\\s*\\.\\s*\\d\\s*\\d\\s+d\\s*u\\s*e\\s+([A-Za-z\\s]+?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)"
         ]
       }
     },

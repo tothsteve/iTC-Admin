@@ -334,8 +334,13 @@ class IntegratedWorkflow:
     
     async def _log_berszamfejtes_table_data(self, email, file_path: Path, dropbox_path: str, classification, due_date: str, pdf_text: str) -> bool:
         """Extract table data from Bérszámfejtés tax files and log each row to Google Sheets"""
+        from datetime import datetime
         try:
             filename = file_path.name
+            
+            # Use current month for Google Sheets logging (processing month, not payroll month)
+            current_month = datetime.now().month
+            year = datetime.now().year
             
             # Determine which table to extract
             if 'Adoesjarulekbefizetesek' in filename:
@@ -354,6 +359,14 @@ class IntegratedWorkflow:
             # Log each table row as separate entry in Google Sheets
             success_count = 0
             for row in table_rows:
+                # Determine due date based on tax code - use current month for processing
+                if 'NAV' in row['description'] or any(nav_code in row['tax_code'] for nav_code in ['2510', '2520', '2540']):
+                    # NAV transfers should be 12th of current month
+                    payroll_due_date = f"{year}{current_month:02d}12"
+                else:
+                    # Regular payroll entries should be 1st of current month
+                    payroll_due_date = f"{year}{current_month:02d}01"
+                
                 sheets_data = {
                     'gmail_message_id': email['id'],
                     'sender_email': email['sender'],
@@ -366,7 +379,7 @@ class IntegratedWorkflow:
                     'error_message': '',
                     'extracted_amount': row['amount'],
                     'extracted_eur_amount': None,
-                    'due_date': due_date,
+                    'due_date': payroll_due_date,
                     'sheet_description': f"{row['description']} - {row['account_number']} - {row['tax_code']}",
                     'payment_type': classification.payment_type
                 }
