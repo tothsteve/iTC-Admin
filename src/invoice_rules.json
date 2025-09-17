@@ -36,6 +36,44 @@
       }
     },
     {
+      "name": "Alza",
+      "description": "Alza electronics and technology purchases",
+      "email_patterns": [
+        "dokumentumok@alza.hu"
+      ],
+      "subject_patterns": [
+        "Számla AHUW",
+        "Számla"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Alza",
+      "sheet_description": "Alza - vásárlás",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Végösszeg:\\s*(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "Végösszeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)",
+          "Összesen:\\s*(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "Összesen:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)",
+          "Fizetendő:\\s*(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "Fizetendő:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)",
+          "(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF",
+          "(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*(?:Ft|HUF)"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Esedékesség:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
       "name": "cleango",
       "description": "Car wash service from cleango",
       "email_patterns": [
