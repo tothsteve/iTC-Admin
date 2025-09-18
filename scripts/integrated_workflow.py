@@ -128,6 +128,21 @@ class IntegratedWorkflow:
         print(f"   PDFs: {len(email.get('pdf_attachments', []))}")
         
         try:
+            # NEW: Check for duplicate processing first
+            if self.sheets_client:
+                print(f"   🔍 Checking if email {email['id']} was already processed...")
+                processing_info = await self.sheets_client.is_email_already_processed(email['id'])
+
+                if processing_info["processed"]:
+                    decision = await self.sheets_client.should_reprocess_email(processing_info)
+                    if not decision["should_reprocess"]:
+                        print(f"   ⏭️  SKIPPED: {decision['reason']}")
+                        return True  # Successfully handled by skipping
+                    else:
+                        print(f"   🔄 REPROCESSING: {decision['reason']}")
+                else:
+                    print(f"   ✨ NEW EMAIL: Not yet processed")
+
             # Check if email should be excluded
             is_excluded, exclusion_reason = self.rules_engine.is_excluded(email)
             if is_excluded:
