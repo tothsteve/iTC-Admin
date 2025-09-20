@@ -71,7 +71,10 @@ class SheetsClient:
                 # Get existing structure - don't modify existing headers
                 existing_headers = self.worksheet.row_values(1) if self.worksheet.row_count > 0 else []
                 logger.info(f"Existing worksheet headers: {existing_headers}")
-                
+
+                # NEW: Ensure duplicate prevention headers are added if missing
+                await self._ensure_headers_exist(existing_headers)
+
                 # We'll append our invoice processing data to the existing structure
                 # Find the next available row for appending
                 all_values = self.worksheet.get_all_values()
@@ -183,7 +186,121 @@ class SheetsClient:
         except Exception as e:
             logger.error(f"OAuth flow failed: {e}")
             return None
-    
+
+    async def _ensure_headers_exist(self, existing_headers: List[str]) -> bool:
+        """Ensure the new duplicate prevention headers exist in the sheet."""
+        try:
+            # Define the expected headers for duplicate prevention
+            expected_new_headers = [
+                "Gmail Message ID",      # Column J
+                "Verification Status",   # Column K
+                "Verification Date",     # Column L
+                "Processing Notes"       # Column M
+            ]
+
+            # Check if we need to add headers by looking for existing new headers
+            headers_to_add = []
+
+            # Check if each expected header already exists in the sheet
+            for new_header in expected_new_headers:
+                if new_header not in existing_headers:
+                    headers_to_add.append(new_header)
+
+            if headers_to_add:
+                logger.info(f"Adding new headers to sheet: {headers_to_add}")
+
+                # Add headers to row 1, starting from the next available column
+                # Find the next empty column to avoid overwriting
+                next_col = len([h for h in existing_headers if h.strip()]) + 1  # 1-based indexing
+                for i, header in enumerate(headers_to_add):
+                    col_letter = chr(ord('A') + next_col - 1 + i)  # Convert to A, B, C...
+                    cell_range = f"{col_letter}1"
+                    self.worksheet.update(cell_range, header)
+                    logger.info(f"Added header '{header}' to column {col_letter}")
+
+                logger.info("✅ Successfully added duplicate prevention headers")
+            else:
+                logger.info("Headers already exist, no additions needed")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to ensure headers exist: {e}")
+            return False
+
+    async def is_email_already_processed(self, gmail_message_id: str) -> Dict[str, Any]:
+        """Check if email is already processed by looking up Gmail Message ID in the sheet."""
+        if not self.worksheet or not gmail_message_id:
+            return {"processed": False, "reason": "No worksheet or message ID"}
+
+        try:
+            logger.info(f"🔍 Checking if email {gmail_message_id} is already processed...")
+
+            # Try to find the Gmail Message ID in column J (index 9)
+            try:
+                cell = self.worksheet.find(gmail_message_id)
+                logger.info(f"📧 Found Gmail Message ID at row {cell.row}")
+
+                # Get the row data to extract verification status and other info
+                row_data = self.worksheet.row_values(cell.row)
+
+                # Extract information from the row
+                result = {
+                    "processed": True,
+                    "row_number": cell.row,
+                    "processing_date": row_data[0] if len(row_data) > 0 else "",
+                    "payment_type": row_data[1] if len(row_data) > 1 else "",
+                    "amount": row_data[3] if len(row_data) > 3 else "",  # Kiadás HUF
+                    "eur_amount": row_data[5] if len(row_data) > 5 else "",  # Kiadás EUR
+                    "description": row_data[6] if len(row_data) > 6 else "",
+                    "file_link": row_data[7] if len(row_data) > 7 else "",
+                    "gmail_message_id": row_data[9] if len(row_data) > 9 else "",
+                    "verification_status": row_data[10] if len(row_data) > 10 else "pending",
+                    "verification_date": row_data[11] if len(row_data) > 11 else "",
+                    "processing_notes": row_data[12] if len(row_data) > 12 else ""
+                }
+
+                logger.info(f"✅ Email already processed with verification status: {result['verification_status']}")
+                return result
+
+            except Exception as cell_not_found_error:
+                # Handle cell not found (gspread exception naming can vary)
+                if "not found" in str(cell_not_found_error).lower():
+                    logger.info(f"📧 Gmail Message ID {gmail_message_id} not found - email not yet processed")
+                    return {"processed": False, "reason": "Message ID not found"}
+                else:
+                    # Re-raise if it's not a "not found" error
+                    raise cell_not_found_error
+
+        except Exception as e:
+            logger.error(f"Failed to check email processing status: {e}")
+            return {"processed": False, "reason": f"Error: {e}"}
+
+    async def should_reprocess_email(self, processing_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Determine if an already-processed email should be reprocessed based on verification status."""
+        if not processing_info.get("processed", False):
+            return {"should_reprocess": True, "reason": "Email not yet processed"}
+
+        verification_status = processing_info.get("verification_status", "pending")
+
+        if verification_status == "verified":
+            return {
+                "should_reprocess": False,
+                "reason": f"Email already verified on {processing_info.get('verification_date', 'unknown date')}"
+            }
+
+        elif verification_status == "rejected":
+            return {
+                "should_reprocess": True,
+                "reason": f"Email marked for reprocessing (rejected)"
+            }
+
+        else:  # pending or unknown status
+            return {
+                "should_reprocess": False,
+                "reason": f"Email with status '{verification_status}' since {processing_info.get('processing_date', 'unknown')}"
+            }
+
     async def log_email_processing(self, email_data: Dict[str, Any]) -> bool:
         """Log email processing data to existing 2025 worksheet."""
         if not self.worksheet:
@@ -225,6 +342,13 @@ class SheetsClient:
             # Use payment type from classification (either "Vállalati számla" or "Saját")
             payment_type = email_data.get('payment_type', 'Vállalati számla')
             
+            # NEW: Add duplicate prevention tracking data
+            gmail_message_id = email_data.get('gmail_message_id', '')
+            # Mark as verified if processing was successful, pending only if there were issues
+            verification_status = email_data.get('verification_status', 'verified')  # Default to verified for successful processing
+            verification_date = email_data.get('verification_date', current_time)  # Set verification date to now
+            processing_notes = email_data.get('processing_notes', f"Auto-verified on {current_time}")
+
             row_data = [
                 date_value,                                    # Dátum (Date) - from due date as proper date
                 payment_type,                                  # Fizetve (Corporate invoice or Personal)
@@ -234,7 +358,11 @@ class SheetsClient:
                 eur_amount_value,                              # Kiadás EUR (Expense EUR) - from extracted EUR amount
                 sheet_description,                             # Megjegyzés (Notes) - from rules
                 email_data.get('dropbox_link', ''),            # Link a számlára (Link to invoice)
-                ''                                             # Column2 (empty)
+                '',                                            # Column2 (empty) - existing structure preserved
+                gmail_message_id,                              # NEW Column J: Gmail Message ID
+                verification_status,                           # NEW Column K: Verification Status
+                verification_date,                             # NEW Column L: Verification Date
+                processing_notes                               # NEW Column M: Processing Notes
             ]
             
             # Append to the next available row with value_input_option to preserve formatting
@@ -266,9 +394,14 @@ class SheetsClient:
             try:
                 cell = self.worksheet.find(gmail_message_id)
                 row_num = cell.row
-            except gspread.exceptions.CellNotFound:
-                logger.warning(f"Gmail message ID not found in spreadsheet: {gmail_message_id}")
-                return False
+            except Exception as cell_not_found_error:
+                # Handle cell not found (gspread exception naming can vary)
+                if "not found" in str(cell_not_found_error).lower():
+                    logger.warning(f"Gmail message ID not found in spreadsheet: {gmail_message_id}")
+                    return False
+                else:
+                    # Re-raise if it's not a "not found" error
+                    raise cell_not_found_error
             
             # Update columns
             updates = []
