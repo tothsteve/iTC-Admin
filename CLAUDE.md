@@ -288,6 +288,62 @@ The system is considered **fully functional** when:
 
 **Current Status: ALL SUCCESS CRITERIA MET ✅**
 
+## 🧪 PATTERN TESTING METHODOLOGY
+
+### ⚠️ CRITICAL: How to Test Invoice Processing Patterns
+
+**NEVER create isolated test scripts** - they don't reflect the real processing pipeline!
+
+#### The ONLY Correct Way to Test Patterns:
+
+1. **Use the real workflow**: `python scripts/integrated_workflow.py --hours 24`
+2. **Test with actual PDFs**: Place PDF files in the directory for testing
+3. **Check the logs**: Look for extraction success/failure messages
+4. **Verify Google Sheets**: Confirm amounts and dates are logged correctly
+
+#### Why Isolated Scripts Don't Work:
+
+- **Different extraction logic**: Real workflow uses `extract_eur_amount()` function with special handling
+- **Multiple capture groups**: Patterns with multiple groups return tuples, not strings
+- **Complex processing pipeline**: Classification → extraction → validation → logging
+- **Error handling**: Real workflow has retry logic and fallbacks
+
+#### EUR Amount Extraction Logic (Fixed for reMarkable):
+
+```python
+# In extract_eur_amount() function:
+if isinstance(match_result, tuple):
+    # Multiple capture groups - reMarkable format: ('2', '9', '9') -> "2.99"
+    if len(match_result) == 3:
+        amount_str = f"{match_result[0]}.{match_result[1]}{match_result[2]}"
+else:
+    # Single capture group - Google/Anthropic formats work as before
+    amount_str = match_result
+```
+
+#### Partner-Specific Pattern Examples:
+
+- **Google**: `"Total in EUR\\s*€(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?)"` → `"32.40"` (string)
+- **Anthropic**: `"€\\s*(\\d\\s*\\d\\s*\\.\\s*\\d\\s*\\d)\\s+d\\s*u\\s*e"` → `"1 8 . 0 0"` (string)
+- **reMarkable**: `"A\\s*m\\s*o\\s*u\\s*n\\s*t\\s+d\\s*u\\s*e\\s+€\\s*(\\d)\\s*\\.\\s*(\\d)\\s*(\\d)"` → `('2', '9', '9')` (tuple)
+
+#### Testing Checklist:
+
+✅ **Pattern matches in PDF text**
+✅ **Amount extracted correctly**: Check logs for "💶 Extracted EUR amount: X.XX EUR"
+✅ **Date extracted correctly**: Check logs for due date conversion
+✅ **Google Sheets updated**: Verify proper amount and date formatting
+✅ **No errors in workflow**: Complete end-to-end processing
+
+#### Recent Pattern Fixes:
+
+- **September 20, 2025**: Fixed reMarkable EUR extraction from 7.00 to 2.99 EUR
+- **September 20, 2025**: Fixed reMarkable due date extraction with generic month patterns
+- **Multi-group patterns**: Added tuple handling for 3-capture-group patterns
+- **Backward compatibility**: Maintained existing Google/Anthropic functionality
+
+**Current Status: reMarkable, Google, and Anthropic patterns all working correctly ✅**
+
 ## 🚀 MANUAL EXECUTION
 
 The system is **production-ready** for manual runs:
@@ -337,5 +393,5 @@ python scripts/integrated_workflow.py --hours 720 --once
 
 **This system represents a complete, tested, and production-ready solution for automated invoice processing from Gmail to Google Sheets with partner-specific business logic.**
 
-Last Updated: September 9, 2025
+Last Updated: September 20, 2025
 System Status: ✅ FULLY OPERATIONAL

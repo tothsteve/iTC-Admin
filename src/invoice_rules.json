@@ -333,6 +333,54 @@
       }
     },
     {
+      "name": "reMarkable",
+      "description": "reMarkable digital paper tablet invoices",
+      "email_patterns": [
+        "noreply@remarkable.com",
+        "support@remarkable.com",
+        "invoice@remarkable.com",
+        "tothi.steve@gmail.com"
+      ],
+      "subject_patterns": [
+        "Your receipt from reMarkable AS",
+        "receipt from reMarkable",
+        "reMarkable AS"
+      ],
+      "pdf_filename_patterns": [
+        "Invoice-"
+      ],
+      "exclude_filename_patterns": [
+        "Receipt-"
+      ],
+      "invoice_type": "kiadas_penztár",
+      "payment_type": "Saját",
+      "filename_prefix": "reMarkable",
+      "sheet_description": "Digitális jegyzetfüzet - reMarkable",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [],
+        "eur_extraction": {
+          "pdf_patterns": [
+            "A\\s*m\\s*o\\s*u\\s*n\\s*t\\s+d\\s*u\\s*e\\s+€\\s*(\\d)\\s*\\.\\s*(\\d)\\s*(\\d)",
+            "€\\s*(\\d)\\s*\\.\\s*(\\d)\\s*(\\d)\\s+d\\s*u\\s*e",
+            "T\\s*o\\s*t\\s*a\\s*l\\s+€\\s*(\\d)\\s*\\.\\s*(\\d)\\s*(\\d)",
+            "€\\s*(\\d+(?:\\.\\d{2})?)",
+            "(\\d+(?:\\.\\d{2})?)\\s*€"
+          ]
+        },
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "([A-Za-z]\\s*[a-z\\s]*?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
+          "€\\s*\\d\\s*\\.\\s*\\d\\s*\\d\\s+d\\s*u\\s*e\\s+([A-Za-z]\\s*[a-z\\s]*?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
+          "D\\s*a\\s*t\\s*e\\s+d\\s*u\\s*e\\s+([A-Za-z]\\s*[a-z\\s]*?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
+          "Due date:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Payment due:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
       "name": "Bérszámfejtés",
       "description": "Payroll processing invoices with multiple PDFs",
       "email_patterns": [

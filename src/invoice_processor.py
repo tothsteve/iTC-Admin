@@ -280,14 +280,28 @@ class InvoiceRulesEngine:
             try:
                 matches = re.findall(pattern, pdf_text, re.IGNORECASE | re.MULTILINE)
                 if matches:
-                    amount_str = matches[0]
+                    match_result = matches[0]
 
-                    # Special handling for Anthropic spaced format: "1 8 . 0 0" -> "18.00"
-                    if re.match(r'^\d\s+\d\s*\.\s*\d\s+\d$', amount_str):
-                        amount_str = re.sub(r'\s+', '', amount_str)  # Remove all spaces
+                    # Handle multiple capture groups (tuples) vs single capture group (string)
+                    if isinstance(match_result, tuple):
+                        # Multiple capture groups - reMarkable format: ('2', '9', '9') -> "2.99"
+                        if len(match_result) == 3:
+                            amount_str = f"{match_result[0]}.{match_result[1]}{match_result[2]}"
+                        elif len(match_result) == 2:
+                            amount_str = f"{match_result[0]}.{match_result[1]}"
+                        else:
+                            # Fallback: join all groups
+                            amount_str = ''.join(match_result)
                     else:
-                        # Standard European number format: 32.40 -> 32.40
-                        amount_str = amount_str.replace(',', '')  # Remove thousands separators if any
+                        # Single capture group (string) - existing logic for Google/Anthropic
+                        amount_str = match_result
+
+                        # Special handling for Anthropic spaced format: "1 8 . 0 0" -> "18.00"
+                        if re.match(r'^\d\s+\d\s*\.\s*\d\s+\d$', amount_str):
+                            amount_str = re.sub(r'\s+', '', amount_str)  # Remove all spaces
+                        else:
+                            # Standard European number format: 32.40 -> 32.40
+                            amount_str = amount_str.replace(',', '')  # Remove thousands separators if any
 
                     eur_amount = float(amount_str)
                     logger.info(f"💶 Extracted EUR amount: {eur_amount}")
@@ -428,11 +442,16 @@ class InvoiceRulesEngine:
                         part1, part2, part3 = match
 
                         # Special handling for month name formats
-                        if classification and (classification.partner_name == "Anthropic" or classification.partner_name == "Google Workspace"):
+                        if classification and (classification.partner_name == "Anthropic" or classification.partner_name == "Google Workspace" or classification.partner_name == "reMarkable"):
                             if classification.partner_name == "Anthropic" and ' ' in part1:
                                 # Anthropic spaced format: ("A u g u s t", "2 4", "2 0 2 5")
                                 month_name = re.sub(r'\s+', '', part1)  # "A u g u s t" -> "August"
                                 day = re.sub(r'\s+', '', part2)         # "2 4" -> "24"
+                                year = re.sub(r'\s+', '', part3)        # "2 0 2 5" -> "2025"
+                            elif classification.partner_name == "reMarkable" and ' ' in part1:
+                                # reMarkable spaced format: ("S e p t e m b e r", "1 9", "2 0 2 5")
+                                month_name = re.sub(r'\s+', '', part1)  # "S e p t e m b e r" -> "September"
+                                day = re.sub(r'\s+', '', part2)         # "1 9" -> "19"
                                 year = re.sub(r'\s+', '', part3)        # "2 0 2 5" -> "2025"
                             elif classification.partner_name == "Google Workspace":
                                 # Google standard format: ("Aug", "31", "2025")
