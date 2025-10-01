@@ -77,6 +77,45 @@
       }
     },
     {
+      "name": "Tárhely.Eu",
+      "description": "Web hosting services from Tárhely.Eu",
+      "email_patterns": [
+        "ugyfelszolgalat@tarhely.eu"
+      ],
+      "subject_patterns": [
+        "E-számlát állítottunk ki Önnek",
+        "számla",
+        "invoice"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Tarhely",
+      "sheet_description": "Tárhely szolgáltatás - Tárhely.Eu",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Fizetendõ végösszeg:\\s*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "Fizetendő végösszeg:\\s*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "végösszeg:\\s*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "Összesen:\\s*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "Fizetendő:\\s*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "Végösszeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
+          "(\\d+(?:\\s\\d{3})*)\\s*Ft"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fiz\\.\\s*határidõ:\\s*(\\d{4})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.",
+          "Fiz\\.\\s*határidő:\\s*(\\d{4})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.",
+          "Fizetési határidő:\\s*(\\d{4})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.",
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fiz\\. határidõ:\\s*(\\d{4})[.\\s]+(\\d{1,2})[.\\s]+(\\d{1,2})",
+          "Esedékesség:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
       "name": "cleango",
       "description": "Car wash service from cleango",
       "email_patterns": [
