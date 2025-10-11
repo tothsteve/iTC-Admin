@@ -515,6 +515,110 @@ class InvoiceRulesEngine:
         
         return None
 
+    def is_web_based_pdf(self, classification: InvoiceClassification = None) -> bool:
+        """
+        Check if this rule uses web-based PDF extraction
+
+        Args:
+            classification: Result from classify_email
+
+        Returns:
+            True if PDF should be downloaded from web, False otherwise
+        """
+        if not classification:
+            return False
+
+        rule = self.rules.get(classification.partner_name)
+        if not rule:
+            return False
+
+        return rule.get('pdf_source') == 'web'
+
+    def extract_amount_from_web(self, web_page_text: str, classification: InvoiceClassification = None) -> Optional[float]:
+        """
+        Extract amount from web page text
+
+        Args:
+            web_page_text: Plain text content from web page
+            classification: Result from classify_email
+
+        Returns:
+            Amount as float or None if not found
+        """
+        if not classification:
+            return None
+
+        rule = self.rules.get(classification.partner_name)
+        if not rule:
+            return None
+
+        extraction_config = rule.get('amount_extraction', {})
+        web_patterns = extraction_config.get('web_patterns', [])
+
+        for pattern in web_patterns:
+            try:
+                matches = re.findall(pattern, web_page_text, re.IGNORECASE | re.MULTILINE)
+                if matches:
+                    amount_str = matches[0]
+                    # Clean up Hungarian number format
+                    if ' ' in amount_str:
+                        amount_str = amount_str.replace(' ', '').replace(',', '.')
+                    else:
+                        amount_str = amount_str.replace('.', '').replace(',', '.')
+
+                    amount = float(amount_str)
+                    logger.info(f"💰 Extracted amount from web: {amount}")
+                    return amount
+            except Exception as e:
+                logger.warning(f"Web pattern '{pattern}' failed: {e}")
+
+        logger.warning(f"⚠️  Could not extract amount from web page")
+        return None
+
+    def extract_due_date_from_web(self, web_page_text: str, classification: InvoiceClassification = None) -> Optional[str]:
+        """
+        Extract due date from web page text
+
+        Args:
+            web_page_text: Plain text content from web page
+            classification: Result from classify_email
+
+        Returns:
+            Due date in YYYYMMDD format or None if not found
+        """
+        if not classification:
+            return None
+
+        rule = self.rules.get(classification.partner_name)
+        if not rule or 'due_date_extraction' not in rule:
+            return None
+
+        due_date_config = rule['due_date_extraction']
+        web_patterns = due_date_config.get('web_patterns', [])
+
+        for pattern in web_patterns:
+            try:
+                matches = re.findall(pattern, web_page_text, re.IGNORECASE | re.MULTILINE)
+                if matches:
+                    match = matches[0]
+                    logger.info(f"Found due date match from web: {match}")
+
+                    if isinstance(match, tuple) and len(match) == 3:
+                        year, month, day = match
+                        try:
+                            date_obj = datetime(int(year), int(month), int(day))
+                            return date_obj.strftime("%Y%m%d")
+                        except ValueError:
+                            continue
+                    else:
+                        # Single match - try to parse
+                        return match.replace('-', '').replace('.', '')
+            except Exception as e:
+                logger.warning(f"Web date pattern '{pattern}' failed: {e}")
+
+        logger.warning(f"⚠️  Could not extract due date from web page")
+        return None
+
 
 # Factory function
 def create_rules_engine(rules_file: str = None) -> InvoiceRulesEngine:

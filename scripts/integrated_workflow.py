@@ -25,6 +25,7 @@ from gmail.client import create_gmail_client
 from sheets.client import create_sheets_client
 from dropbox.local_sync import create_local_dropbox_manager
 from invoice_processor import create_rules_engine
+from utils.web_fetcher import create_web_fetcher
 
 
 class IntegratedWorkflow:
@@ -36,6 +37,7 @@ class IntegratedWorkflow:
         self.sheets_client = None
         self.dropbox_client = None
         self.rules_engine = None
+        self.web_fetcher = None
         self.processed_emails = set()
         
     async def initialize(self) -> bool:
@@ -75,7 +77,15 @@ class IntegratedWorkflow:
             return False
         print("✅ Rules engine ready")
         print(f"   Loaded {len(self.rules_engine.rules)} partner rules")
-        
+
+        # Initialize web fetcher
+        print("\\n5. Initializing web fetcher...")
+        self.web_fetcher = create_web_fetcher()
+        if not self.web_fetcher:
+            print("❌ Failed to initialize web fetcher")
+            return False
+        print("✅ Web fetcher ready")
+
         print("\\n🎉 All clients initialized successfully!")
         return True
     
@@ -85,15 +95,34 @@ class IntegratedWorkflow:
         
         try:
             print(f"📧 DEBUG: About to call Gmail API for last {hours_back} hours...")
+
             # Get ALL emails with PDF attachments (no domain/subject filtering)
             # We'll use the rules engine to classify them instead
-            emails = await self.gmail_client.get_all_recent_emails_with_pdfs(
+            emails_with_pdfs = await self.gmail_client.get_all_recent_emails_with_pdfs(
                 hours_back=hours_back,
                 max_results=50
             )
-            print(f"📧 DEBUG: Gmail API returned {len(emails)} emails")
-            
-            print(f"Found {len(emails)} emails with PDF attachments")
+            print(f"📧 DEBUG: Found {len(emails_with_pdfs)} emails with PDF attachments")
+
+            # ALSO search for Yettel emails (which don't have PDF attachments)
+            print(f"📧 DEBUG: Searching for Yettel emails without attachments...")
+            yettel_emails = await self.gmail_client.get_recent_emails_all(
+                hours_back=hours_back,
+                max_results=50,
+                sender_filter="eszamla@yettel.hu"
+            )
+            print(f"📧 DEBUG: Found {len(yettel_emails)} Yettel emails")
+
+            # Combine both lists and remove duplicates by email ID
+            emails = emails_with_pdfs.copy()
+            existing_ids = {email['id'] for email in emails}
+            for yettel_email in yettel_emails:
+                if yettel_email['id'] not in existing_ids:
+                    emails.append(yettel_email)
+                    existing_ids.add(yettel_email['id'])
+
+            print(f"📧 DEBUG: Total {len(emails)} emails to process")
+            print(f"Found {len(emails)} emails to process")
             
             # Filter new emails
             new_emails = []
@@ -162,7 +191,15 @@ class IntegratedWorkflow:
             print(f"   🎯 Matched: {', '.join(classification.matched_patterns)}")
             print(f"   💰 Invoice Type: {classification.invoice_type}")
             print(f"   📁 Folder: {classification.folder_path}")
-            
+
+            # Check if this is a web-based PDF invoice
+            if self.rules_engine.is_web_based_pdf(classification):
+                print(f"   🌐 Web-based invoice detected - downloading from web link")
+                success = await self.process_web_based_invoice(email, classification)
+                if not success:
+                    print(f"   ⚠️  Failed to process web-based invoice")
+                return success
+
             # Process each PDF attachment (with filename filtering if specified)
             for attachment in email.get('pdf_attachments', []):
                 # Check if this PDF should be processed based on filename patterns
@@ -172,13 +209,149 @@ class IntegratedWorkflow:
                         print(f"   ⚠️  Failed to process attachment: {attachment['filename']}")
                 else:
                     print(f"   ⏭️  Skipped attachment (filename filter): {attachment['filename']}")
-            
+
             return True
             
         except Exception as e:
             print(f"   ❌ Error processing email: {e}")
             return False
-    
+
+    async def process_web_based_invoice(self, email: dict, classification) -> bool:
+        """Process an invoice that requires downloading PDF from a web link"""
+        print(f"   🌐 Processing web-based invoice: {email['subject'][:50]}...")
+
+        try:
+            # Get email body
+            email_body = email.get('body', '')
+            if not email_body:
+                print(f"      ⚠️  No email body found")
+                return False
+
+            # Get the rule for this classification
+            rule = self.rules_engine.rules.get(classification.partner_name)
+            if not rule:
+                print(f"      ⚠️  No rule found for {classification.partner_name}")
+                return False
+
+            # Step 1: Process web invoice (download PDF and extract web data)
+            print(f"      1. Fetching invoice from web...")
+            pdf_data, web_data, web_text = self.web_fetcher.process_web_invoice(email_body, rule)
+
+            if not pdf_data:
+                print(f"      ❌ Failed to download PDF from web")
+                return False
+
+            print(f"      ✅ Downloaded PDF from web ({len(pdf_data)} bytes)")
+
+            # Step 2: Save PDF to Dropbox folder
+            year = datetime.now().year
+            dropbox_folder = Path(self.dropbox_client.settings.dropbox_sync_folder)
+            target_folder = dropbox_folder / str(year) / classification.folder_path
+            target_folder.mkdir(parents=True, exist_ok=True)
+
+            # Generate filename from web data or use invoice number
+            invoice_number = web_data.get('invoice_number_pattern')
+            if invoice_number and isinstance(invoice_number, tuple):
+                invoice_number = invoice_number[0] if len(invoice_number) > 0 else None
+
+            filename = f"invoice_{invoice_number or datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+            temp_file_path = target_folder / filename
+
+            with open(temp_file_path, 'wb') as f:
+                f.write(pdf_data)
+
+            print(f"      ✅ Saved PDF to: {temp_file_path.name}")
+
+            # Step 3: Extract data from PDF
+            extracted_amount = None
+            extracted_eur_amount = None
+            due_date = None
+
+            if classification.confidence > 0.5 and PDF_AVAILABLE:
+                print(f"      2. Extracting data from PDF...")
+                try:
+                    pdf_text = self._extract_pdf_text(temp_file_path)
+
+                    # Try web page text first (more reliable)
+                    if web_text:
+                        # Try to extract amount from web page text
+                        extracted_amount = self.rules_engine.extract_amount_from_web(web_text, classification)
+                        if extracted_amount:
+                            print(f"      💰 Extracted amount from web: {extracted_amount:,.0f} HUF")
+
+                        # Try to extract due date from web page text
+                        due_date = self.rules_engine.extract_due_date_from_web(web_text, classification)
+                        if due_date:
+                            print(f"      📅 Extracted due date from web: {due_date}")
+
+                    # Fallback to PDF extraction if web extraction failed
+                    if not extracted_amount and pdf_text:
+                        extracted_amount = self.rules_engine.extract_amount(email, pdf_text, classification)
+                        if extracted_amount:
+                            print(f"      💰 Extracted amount from PDF: {extracted_amount:,.0f} HUF")
+
+                    if not due_date and pdf_text:
+                        due_date = self.rules_engine.extract_due_date(pdf_text, classification)
+                        if due_date:
+                            print(f"      📅 Extracted due date from PDF: {due_date}")
+
+                    # Use today's date if no due date found
+                    if not due_date:
+                        due_date = datetime.now().strftime("%Y%m%d")
+                        print(f"      📅 Using today as due date: {due_date}")
+
+                except Exception as e:
+                    print(f"      ⚠️  Data extraction failed: {e}")
+                    due_date = datetime.now().strftime("%Y%m%d")
+            else:
+                due_date = datetime.now().strftime("%Y%m%d")
+
+            # Step 4: Rename file with date prefix and rule prefix
+            local_file_path = self._rename_file_with_prefixes(temp_file_path, classification, due_date)
+            print(f"      📝 Renamed to: {local_file_path.name}")
+
+            # Step 5: File is already in final location
+            dropbox_path = str(local_file_path)
+            print(f"      ✅ File ready in: {dropbox_path}")
+
+            # Step 6: Log to Google Sheets
+            print(f"      3. Logging to Google Sheets...")
+
+            # Get sheet description from rules
+            sheet_description = rule.get('sheet_description', '')
+
+            sheets_data = {
+                'gmail_message_id': email['id'],
+                'sender_email': email['sender'],
+                'subject': email['subject'],
+                'pdf_filename': local_file_path.name,
+                'pdf_size_bytes': len(pdf_data),
+                'local_path': str(local_file_path),
+                'dropbox_link': dropbox_path or '',
+                'processing_status': 'COMPLETED',
+                'error_message': '',
+                'extracted_amount': extracted_amount,
+                'extracted_eur_amount': extracted_eur_amount,
+                'due_date': due_date,
+                'sheet_description': sheet_description,
+                'payment_type': classification.payment_type
+            }
+
+            sheets_success = await self.sheets_client.log_email_processing(sheets_data)
+            if sheets_success:
+                print(f"      ✅ Logged to Google Sheets")
+            else:
+                print(f"      ⚠️  Google Sheets logging failed")
+
+            print(f"      🎉 Completed processing web-based invoice")
+            return True
+
+        except Exception as e:
+            print(f"      ❌ Error processing web-based invoice: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     async def process_single_attachment(self, email: dict, attachment: dict, classification) -> bool:
         """Process a single PDF attachment through the complete workflow."""
         filename = attachment['filename']

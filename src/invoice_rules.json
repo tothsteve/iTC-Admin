@@ -468,6 +468,62 @@
         ],
         "email_patterns": []
       }
+    },
+    {
+      "name": "Yettel",
+      "description": "Mobile service provider invoices from web portal",
+      "email_patterns": [
+        "eszamla@yettel.hu"
+      ],
+      "subject_patterns": [
+        "Elektronikus számlája elérhető - értesítés",
+        "Elektronikus számlája elérhető",
+        "számla elérhető"
+      ],
+      "pdf_source": "web",
+      "web_extraction": {
+        "invoice_page_url_patterns": [
+          "https://online\\.yettel\\.hu/ugyfelszolgalat/fwk/invoice\\.aspx\\?invoiceno=[0-9]+&Id=[0-9]+"
+        ],
+        "pdf_download_link_patterns": [
+          "Számla pdf letöltése",
+          "pdf letöltése",
+          "Download PDF"
+        ],
+        "web_page_data_extraction": {
+          "amount_pattern": "Összeg:[\\s\\n]*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "due_date_pattern": "Fizetési határidő:[\\s\\n]*(\\d{4})\\.(\\d{1,2})\\.(\\d{1,2})",
+          "invoice_number_pattern": "Számlaszám:[\\s\\n]*([0-9]+)",
+          "customer_id_pattern": "Yettel ügyfélazonosító:[\\s\\n]*([0-9]+)"
+        }
+      },
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Yettel",
+      "sheet_description": "Mobilszolgáltatás - Yettel",
+      "amount_extraction": {
+        "method": "web",
+        "web_patterns": [
+          "Összeg:[\\s\\n]*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "Összeg:[\\s\\n]*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft"
+        ],
+        "pdf_patterns": [
+          "Összesen:[\\s\\n]*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "Fizetendő:[\\s\\n]*(\\d+(?:\\s\\d{3})*)\\s*Ft",
+          "Végösszeg:[\\s\\n]*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft"
+        ],
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "web_patterns": [
+          "Fizetési határidő:[\\s\\n]*(\\d{4})\\.(\\d{1,2})\\.(\\d{1,2})"
+        ],
+        "pdf_patterns": [
+          "Fizetési határidő:[\\s\\n]*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
+          "Fizetési határidő\\s*(\\d{4})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})",
+          "Esedékesség:[\\s\\n]*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
     }
   ],
   "exclusion_rules": [

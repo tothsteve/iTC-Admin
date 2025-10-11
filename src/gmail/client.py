@@ -190,9 +190,14 @@ class GmailClient:
                 'sender': headers.get('From', ''),
                 'date': headers.get('Date', ''),
                 'timestamp': int(message.get('internalDate', 0)) / 1000,
-                'attachments': []
+                'attachments': [],
+                'body': ''
             }
-            
+
+            # Extract email body
+            body_text = self._extract_body(message['payload'])
+            message_info['body'] = body_text
+
             # Extract attachments
             attachments = await self._extract_attachments(message['payload'], message_id)
             message_info['attachments'] = attachments
@@ -215,7 +220,48 @@ class GmailClient:
         except Exception as e:
             logger.error(f"Failed to get message details for {message_id}: {e}")
             return None
-    
+
+    def _extract_body(self, payload: Dict[str, Any]) -> str:
+        """Extract email body text from message payload."""
+        body = ""
+
+        try:
+            # Try to get plain text or HTML body
+            if 'body' in payload and payload['body'].get('data'):
+                # Single-part message
+                body_data = payload['body']['data']
+                body = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore')
+            elif 'parts' in payload:
+                # Multi-part message
+                for part in payload['parts']:
+                    if part.get('mimeType') == 'text/plain':
+                        if 'data' in part.get('body', {}):
+                            body_data = part['body']['data']
+                            body = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore')
+                            break
+                    elif part.get('mimeType') == 'text/html' and not body:
+                        # Fall back to HTML if no plain text
+                        if 'data' in part.get('body', {}):
+                            body_data = part['body']['data']
+                            body = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore')
+                    elif 'parts' in part:
+                        # Nested parts (e.g., multipart/alternative)
+                        for subpart in part['parts']:
+                            if subpart.get('mimeType') == 'text/plain':
+                                if 'data' in subpart.get('body', {}):
+                                    body_data = subpart['body']['data']
+                                    body = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore')
+                                    break
+                            elif subpart.get('mimeType') == 'text/html' and not body:
+                                if 'data' in subpart.get('body', {}):
+                                    body_data = subpart['body']['data']
+                                    body = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore')
+
+        except Exception as e:
+            logger.warning(f"Failed to extract body: {e}")
+
+        return body.strip()
+
     async def _extract_attachments(
         self,
         payload: Dict[str, Any],
