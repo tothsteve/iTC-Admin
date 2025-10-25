@@ -348,7 +348,7 @@ else:
 
 The system is **production-ready** for manual runs:
 
-```bash  
+```bash
 # Activate environment and run for last 24 hours
 cd /Users/tothi/Workspace/ITCardigan/git/ITC-Admin
 source venv/bin/activate
@@ -357,9 +357,153 @@ python scripts/integrated_workflow.py --hours 24 --once
 # For longer periods (e.g., weekly runs)
 python scripts/integrated_workflow.py --hours 168 --once
 
-# For very long periods (e.g., monthly runs) 
+# For very long periods (e.g., monthly runs)
 python scripts/integrated_workflow.py --hours 720 --once
 ```
+
+## 📄 MANUAL PDF PROCESSING
+
+**NEW FEATURE**: Process individual PDF invoices that aren't from Gmail emails (e.g., downloaded from vendor portals, scanned documents, forwarded files).
+
+### Usage
+
+```bash
+# Basic usage - auto-detect partner
+python scripts/manual_invoice_processor.py ~/Downloads/invoice.pdf
+
+# Specify partner name (skip auto-detection)
+python scripts/manual_invoice_processor.py ~/Downloads/invoice.pdf --partner "Danubius Expert"
+
+# Test extraction without copying/logging (dry-run mode)
+python scripts/manual_invoice_processor.py ~/Downloads/invoice.pdf --dry-run
+```
+
+### Features
+
+1. **Smart Partner Detection**
+   - Automatically scans PDF content and filename to match against existing partner rules
+   - Shows confidence score and matched patterns
+   - Lets you confirm or select from full partner list
+
+2. **Comprehensive Data Extraction**
+   - Amount (HUF/EUR/USD) - uses partner-specific extraction patterns
+   - Due date - supports multiple date formats
+   - Invoice date - for filename prefix generation
+   - Invoice number - from filename or PDF content
+   - Partner name - validated against configured rules
+
+3. **Interactive Confirmation**
+   - Displays all extracted data in formatted table
+   - Prompts you to confirm or edit each field
+   - Validates input (dates, amounts, required fields)
+   - Press Enter to accept default values
+
+4. **Duplicate Prevention**
+   - Checks Google Sheets for existing invoice by number/filename
+   - Shows duplicate details if found
+   - Lets you decide whether to proceed or cancel
+
+5. **Complete Processing**
+   - Copies to Dropbox with standardized naming: `YYYYMMDD_Prefix_Original.pdf`
+   - Uses same folder structure as email processing
+   - Logs to Google Sheets with proper column mapping
+   - Marks as "Verified (Manual)" in processing notes
+   - Displays success summary with all details
+
+### Interactive Example
+
+```bash
+$ python scripts/manual_invoice_processor.py ~/Downloads/danubius_invoice.pdf
+
+🚀 Initializing invoice processor...
+
+✅ Loaded 13 partner rules
+✅ Connected to Google Sheets
+✅ Initialized Dropbox sync folder
+
+✅ All systems ready!
+
+📄 Processing PDF: danubius_invoice.pdf
+   Size: 125.3 KB
+📝 Extracting text from PDF: danubius_invoice.pdf
+✅ Extracted 2,145 characters from 2 pages
+
+🔍 Auto-detecting business partner...
+   Found potential match: Danubius Expert
+   Confidence: 0.85
+   Matched patterns: email: szamlakuldes@danubiusexpert.hu
+
+❓ Is this correct? (Y/n/show-all): y
+
+✅ Using partner: Danubius Expert
+
+💰 Extracting invoice data...
+✅ Extracted 61,976 HUF from PDF
+📅 Extracted due date: 20250912
+
+============================================================
+📋 EXTRACTED DATA
+============================================================
+   Partner Name:    Danubius Expert
+   Amount (HUF):    61,976 HUF
+   Due Date:        2025-09-12
+   Invoice Date:    2025-09-01
+   Invoice Number:  KI2501065
+============================================================
+
+❓ Confirm extracted data:
+
+   Partner Name (Danubius Expert): [Enter to confirm]
+   Amount (HUF) (61976): [Enter]
+   Due Date (YYYY-MM-DD) (2025-09-12): [Enter]
+   Invoice Date (YYYY-MM-DD) (2025-09-01): [Enter]
+   Invoice Number (KI2501065): [Enter]
+
+🔍 Checking for duplicates...
+✅ No duplicate found
+
+📁 New filename: 20250901_Könyvelés_KI2501065_ITCardiganKft.pdf
+📂 Copying to Dropbox...
+✅ File copied to: /Users/tothi/Dropbox/ITCardigan/2025/Bejövő/Könyvelés/...
+
+📊 Logging to Google Sheets...
+✅ Successfully logged to Google Sheets
+
+============================================================
+✅ PROCESSING COMPLETE
+============================================================
+   Partner:      Danubius Expert
+   Amount:       61,976 HUF
+   Due Date:     20250912
+   Invoice #:    KI2501065
+   Dropbox:      /Users/tothi/Dropbox/ITCardigan/2025/Bejövő/Könyvelés/20250901_Könyvelés_KI2501065_ITCardiganKft.pdf
+============================================================
+```
+
+### Use Cases
+
+1. **Vendor Portal Downloads**: Process invoices downloaded directly from vendor websites
+2. **Scanned Documents**: Process paper invoices scanned to PDF
+3. **Forwarded Attachments**: Process PDFs received via messenger/file sharing
+4. **Manual Entry**: Add invoices that failed automatic email processing
+5. **Historical Data**: Backfill Google Sheets with old invoices
+
+### Technical Details
+
+- **Reuses all existing components**: Rules engine, extraction patterns, Sheets logger, Dropbox manager
+- **Same folder structure**: Organizes files identically to email processing
+- **Duplicate tracking**: Uses special Gmail Message ID format: `manual_{invoice_number}_{timestamp}`
+- **Verification status**: Marked as "Verified (Manual)" to distinguish from automated processing
+- **All partner rules supported**: Works with all 13+ configured business partners
+
+### Requirements
+
+- Virtual environment activated (`source venv/bin/activate`)
+- Google Sheets initialized and accessible
+- Dropbox sync folder configured
+- Partner rules loaded from `src/invoice_rules.json`
+
+**Status**: ✅ Fully implemented and tested
 
 ## 📈 FUTURE ENHANCEMENTS
 
@@ -393,5 +537,7 @@ python scripts/integrated_workflow.py --hours 720 --once
 
 **This system represents a complete, tested, and production-ready solution for automated invoice processing from Gmail to Google Sheets with partner-specific business logic.**
 
-Last Updated: September 20, 2025
+**NEW**: Manual PDF processing feature added for processing individual invoices outside of Gmail workflow.
+
+Last Updated: October 25, 2025
 System Status: ✅ FULLY OPERATIONAL

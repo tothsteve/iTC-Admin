@@ -30,7 +30,14 @@ class Settings(BaseSettings):
     max_concurrent_processes: int = Field(default=5, env="MAX_CONCURRENT_PROCESSES")
     retry_max_attempts: int = Field(default=3, env="RETRY_MAX_ATTEMPTS")
     retry_backoff_seconds: int = Field(default=30, env="RETRY_BACKOFF_SECONDS")
-    
+
+    # Logging Configuration
+    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_dir: str = Field(default="logs", env="LOG_DIR")
+    log_file: str = Field(default="logs/itc_admin.log", env="LOG_FILE")
+    log_max_size: str = Field(default="10MB", env="LOG_MAX_SIZE")
+    log_backup_count: int = Field(default=5, env="LOG_BACKUP_COUNT")
+
     @property
     def credentials_dir(self) -> str:
         """Return credentials directory path."""
