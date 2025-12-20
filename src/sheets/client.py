@@ -239,6 +239,9 @@ class SheetsClient:
             # Try to find the Gmail Message ID in column J (index 9)
             try:
                 cell = self.worksheet.find(gmail_message_id)
+                if cell is None:
+                    logger.info(f"📧 Gmail Message ID {gmail_message_id} not found - email not yet processed")
+                    return {"processed": False, "reason": "Message ID not found"}
                 logger.info(f"📧 Found Gmail Message ID at row {cell.row}")
 
                 # Get the row data to extract verification status and other info
@@ -323,7 +326,11 @@ class SheetsClient:
             # Use extracted EUR amount as float to preserve decimals (32.4 not 32)
             extracted_eur_amount = email_data.get('extracted_eur_amount')
             eur_amount_value = extracted_eur_amount if extracted_eur_amount else ""
-            
+
+            # Use extracted USD amount as float to preserve decimals
+            extracted_usd_amount = email_data.get('extracted_usd_amount')
+            usd_amount_value = extracted_usd_amount if extracted_usd_amount else ""
+
             # Use extracted due date as proper date object for column A
             due_date = email_data.get('due_date')
             if due_date and len(due_date) == 8:  # YYYYMMDD format
@@ -338,7 +345,18 @@ class SheetsClient:
             
             # Use sheet description from classification/rules if available
             sheet_description = email_data.get('sheet_description', f"Email: {email_data.get('pdf_filename', 'unknown')} from {email_data.get('sender_email', 'unknown')}")
-            
+
+            # Use EUR column for USD amounts (Column F)
+            # If both EUR and USD are present, prioritize EUR and add USD to description
+            eur_column_value = ""
+            if eur_amount_value:
+                eur_column_value = eur_amount_value
+                if usd_amount_value:
+                    sheet_description = f"{sheet_description} (${usd_amount_value:.2f} USD)"
+            elif usd_amount_value:
+                # Use USD in EUR column when no EUR amount
+                eur_column_value = usd_amount_value
+
             # Use payment type from classification (either "Vállalati számla" or "Saját")
             payment_type = email_data.get('payment_type', 'Vállalati számla')
             
@@ -355,7 +373,7 @@ class SheetsClient:
                 '',                                            # Bevétel HUF (Income HUF) - empty for expenses
                 amount_value,                                  # Kiadás HUF (Expense HUF) - as integer
                 '',                                            # Bevétel EUR (Income EUR) - empty
-                eur_amount_value,                              # Kiadás EUR (Expense EUR) - from extracted EUR amount
+                eur_column_value,                              # Kiadás EUR (Expense EUR) - from EUR or USD amount
                 sheet_description,                             # Megjegyzés (Notes) - from rules
                 email_data.get('dropbox_link', ''),            # Link a számlára (Link to invoice)
                 '',                                            # Column2 (empty) - existing structure preserved

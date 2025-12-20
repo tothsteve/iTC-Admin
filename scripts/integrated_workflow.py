@@ -265,6 +265,7 @@ class IntegratedWorkflow:
             # Step 3: Extract data from PDF
             extracted_amount = None
             extracted_eur_amount = None
+            extracted_usd_amount = None
             due_date = None
 
             if classification.confidence > 0.5 and PDF_AVAILABLE:
@@ -332,6 +333,7 @@ class IntegratedWorkflow:
                 'error_message': '',
                 'extracted_amount': extracted_amount,
                 'extracted_eur_amount': extracted_eur_amount,
+                'extracted_usd_amount': extracted_usd_amount,
                 'due_date': due_date,
                 'sheet_description': sheet_description,
                 'payment_type': classification.payment_type
@@ -397,6 +399,7 @@ class IntegratedWorkflow:
             # Step 3: Extract amount and due date from PDF if it's a high-confidence match
             extracted_amount = None
             extracted_eur_amount = None
+            extracted_usd_amount = None
             due_date = None
             if classification.confidence > 0.5 and PDF_AVAILABLE:
                 print(f"      2. Extracting data from PDF...")
@@ -414,7 +417,12 @@ class IntegratedWorkflow:
                         extracted_eur_amount = self.rules_engine.extract_eur_amount(email, pdf_text, classification)
                         if extracted_eur_amount:
                             print(f"      💶 Extracted EUR amount: {extracted_eur_amount:.2f} EUR")
-                        
+
+                        # Extract USD amount if applicable
+                        extracted_usd_amount = self.rules_engine.extract_usd_amount(email, pdf_text, classification)
+                        if extracted_usd_amount:
+                            print(f"      💵 Extracted USD amount: ${extracted_usd_amount:.2f} USD")
+
                         # Extract due date
                         due_date = self.rules_engine.extract_due_date(pdf_text, classification)
                         if due_date:
@@ -477,6 +485,7 @@ class IntegratedWorkflow:
                     'error_message': '' if dropbox_path else 'Dropbox copy failed',
                     'extracted_amount': extracted_amount,
                     'extracted_eur_amount': extracted_eur_amount,
+                    'extracted_usd_amount': extracted_usd_amount,
                     'due_date': due_date,
                     'sheet_description': sheet_description,
                     'payment_type': classification.payment_type
@@ -567,6 +576,7 @@ class IntegratedWorkflow:
                     'error_message': '',
                     'extracted_amount': row['amount'],
                     'extracted_eur_amount': None,
+                    'extracted_usd_amount': None,
                     'due_date': payroll_due_date,
                     'sheet_description': f"{row['description']} - {row['account_number']} - {row['tax_code']}",
                     'payment_type': classification.payment_type

@@ -311,7 +311,65 @@ class InvoiceRulesEngine:
         
         logger.warning(f"⚠️  Could not extract EUR amount")
         return None
-    
+
+    def extract_usd_amount(self, email_data: Dict[str, Any], pdf_text: str = "", classification: InvoiceClassification = None) -> Optional[float]:
+        """
+        Extract USD amount from PDF for USD invoices like Railway Corporation
+
+        Args:
+            email_data: Email content
+            pdf_text: Extracted PDF text
+            classification: Result from classify_email
+
+        Returns:
+            USD amount as float or None if not found
+        """
+        if not classification or not pdf_text:
+            return None
+
+        # Get the rule for this classification
+        rule = self.rules.get(classification.partner_name)
+        if not rule:
+            return None
+
+        # Check if rule has USD extraction config
+        usd_extraction = rule.get('amount_extraction', {}).get('usd_extraction', {})
+        if not usd_extraction:
+            return None
+
+        pdf_patterns = usd_extraction.get('pdf_patterns', [])
+
+        for pattern in pdf_patterns:
+            try:
+                matches = re.findall(pattern, pdf_text, re.IGNORECASE | re.MULTILINE)
+                if matches:
+                    match_result = matches[0]
+
+                    # Handle multiple capture groups (tuples) vs single capture group (string)
+                    if isinstance(match_result, tuple):
+                        # Multiple capture groups
+                        if len(match_result) == 3:
+                            amount_str = f"{match_result[0]}.{match_result[1]}{match_result[2]}"
+                        elif len(match_result) == 2:
+                            amount_str = f"{match_result[0]}.{match_result[1]}"
+                        else:
+                            # Fallback: join all groups
+                            amount_str = ''.join(match_result)
+                    else:
+                        # Single capture group (string)
+                        amount_str = match_result
+                        # USD uses standard format: XX.XX (no special conversion needed)
+                        amount_str = amount_str.replace(',', '')  # Remove thousands separators if any
+
+                    usd_amount = float(amount_str)
+                    logger.info(f"💵 Extracted USD amount: ${usd_amount:.2f}")
+                    return usd_amount
+            except Exception as e:
+                logger.warning(f"USD pattern '{pattern}' failed: {e}")
+
+        logger.warning(f"⚠️  Could not extract USD amount")
+        return None
+
     def _extract_from_email(self, email_data: Dict[str, Any], patterns: List[str]) -> Optional[float]:
         """Extract amount from email body using regex patterns"""
         email_text = f"{email_data.get('subject', '')} {email_data.get('body', '')}"
@@ -442,14 +500,14 @@ class InvoiceRulesEngine:
                         part1, part2, part3 = match
 
                         # Special handling for month name formats
-                        if classification and (classification.partner_name == "Anthropic" or classification.partner_name == "Google Workspace" or classification.partner_name == "reMarkable"):
+                        if classification and (classification.partner_name == "Anthropic" or classification.partner_name == "Google Workspace" or classification.partner_name == "reMarkable" or classification.partner_name == "Railway Corporation"):
                             if classification.partner_name == "Anthropic" and ' ' in part1:
                                 # Anthropic spaced format: ("A u g u s t", "2 4", "2 0 2 5")
                                 month_name = re.sub(r'\s+', '', part1)  # "A u g u s t" -> "August"
                                 day = re.sub(r'\s+', '', part2)         # "2 4" -> "24"
                                 year = re.sub(r'\s+', '', part3)        # "2 0 2 5" -> "2025"
-                            elif classification.partner_name == "reMarkable" and ' ' in part1:
-                                # reMarkable spaced format: ("S e p t e m b e r", "1 9", "2 0 2 5")
+                            elif (classification.partner_name == "reMarkable" or classification.partner_name == "Railway Corporation") and ' ' in part1:
+                                # reMarkable/Railway spaced format: ("S e p t e m b e r", "1 9", "2 0 2 5")
                                 month_name = re.sub(r'\s+', '', part1)  # "S e p t e m b e r" -> "September"
                                 day = re.sub(r'\s+', '', part2)         # "1 9" -> "19"
                                 year = re.sub(r'\s+', '', part3)        # "2 0 2 5" -> "2025"

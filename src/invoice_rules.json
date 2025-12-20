@@ -381,6 +381,7 @@
         "noreply@remarkable.com",
         "support@remarkable.com",
         "invoice@remarkable.com",
+        "invoice+statements@remarkable.com",
         "tothi.steve@gmail.com"
       ],
       "subject_patterns": [
@@ -476,6 +477,7 @@
         "eszamla@yettel.hu"
       ],
       "subject_patterns": [
+        "Új számlád elérhető",
         "Elektronikus számlája elérhető - értesítés",
         "Elektronikus számlája elérhető",
         "számla elérhető"
@@ -522,6 +524,61 @@
           "Fizetési határidő:[\\s\\n]*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})",
           "Fizetési határidő\\s*(\\d{4})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})",
           "Esedékesség:[\\s\\n]*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Railway Corporation",
+      "description": "Railway cloud platform hosting services",
+      "email_patterns": [
+        "@stripe.com",
+        "tothi.steve@gmail.com"
+      ],
+      "subject_patterns": [
+        "Your receipt from Railway Corporation",
+        "receipt from Railway Corporation",
+        "Railway Corporation"
+      ],
+      "pdf_filename_patterns": [
+        "Invoice-"
+      ],
+      "exclude_filename_patterns": [
+        "Receipt-"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Railway",
+      "sheet_description": "Cloud hosting - Railway",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [],
+        "usd_extraction": {
+          "pdf_patterns": [
+            "A\\s*m\\s*o\\s*u\\s*n\\s*t\\s+d\\s*u\\s*e\\s+\\$\\s*(\\d)\\s*\\.\\s*(\\d)\\s*(\\d)\\s+U\\s*S\\s*D",
+            "\\$\\s*(\\d)\\s*\\.\\s*(\\d)\\s*(\\d)\\s+U\\s*S\\s*D",
+            "T\\s*o\\s*t\\s*a\\s*l\\s+\\$\\s*(\\d)\\s*\\.\\s*(\\d)\\s*(\\d)",
+            "\\$\\s*(\\d+\\.\\d{2})\\s+USD",
+            "USD\\s*\\$\\s*(\\d+\\.\\d{2})",
+            "Total.*?\\$\\s*(\\d+\\.\\d{2})",
+            "Amount.*?\\$\\s*(\\d+\\.\\d{2})",
+            "Amount due.*?\\$\\s*(\\d+\\.\\d{2})",
+            "\\$\\s*(\\d+\\.\\d{2})",
+            "(\\d+\\.\\d{2})\\s*USD"
+          ]
+        },
+        "email_patterns": []
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "D\\s*a\\s*t\\s*e\\s+o\\s*f\\s+i\\s*s\\s*s\\s*u\\s*e\\s+([A-Za-z\\s]+?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
+          "D\\s*a\\s*t\\s*e\\s+d\\s*u\\s*e\\s+([A-Za-z\\s]+?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
+          "([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
+          "Due date:\\s*([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
+          "Date due:\\s*([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
+          "Payment due:\\s*([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
+          "Due:\\s*([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
+          "(\\d{4})-(\\d{2})-(\\d{2})",
+          "(\\d{1,2})/(\\d{1,2})/(\\d{4})"
         ]
       }
     }
