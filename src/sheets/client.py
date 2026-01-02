@@ -61,8 +61,8 @@ class SheetsClient:
                 logger.error(f"Spreadsheet not found with ID: {self.settings.sheets_spreadsheet_id}")
                 return False
             
-            # Use existing 2025 worksheet (user confirmed it exists with data)
-            worksheet_name = "2025"
+            # Use existing 2026 worksheet (user confirmed it exists with data)
+            worksheet_name = "2026"
             try:
                 self.worksheet = spreadsheet.worksheet(worksheet_name)
                 logger.info(f"Connected to existing worksheet: {worksheet_name}")
