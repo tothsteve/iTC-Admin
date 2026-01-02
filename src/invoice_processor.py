@@ -296,9 +296,10 @@ class InvoiceRulesEngine:
                         # Single capture group (string) - existing logic for Google/Anthropic
                         amount_str = match_result
 
-                        # Special handling for Anthropic spaced format: "1 8 . 0 0" -> "18.00"
-                        if re.match(r'^\d\s+\d\s*\.\s*\d\s+\d$', amount_str):
-                            amount_str = re.sub(r'\s+', '', amount_str)  # Remove all spaces
+                        # Special handling for Anthropic spaced format: "5 . 0 0" or "1 8 . 0 0" -> "5.00" or "18.00"
+                        if re.search(r'\s', amount_str):
+                            # If there are any spaces, remove them all
+                            amount_str = re.sub(r'\s+', '', amount_str)
                         else:
                             # Standard European number format: 32.40 -> 32.40
                             amount_str = amount_str.replace(',', '')  # Remove thousands separators if any

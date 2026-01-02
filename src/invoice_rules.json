@@ -361,16 +361,20 @@
         "pdf_patterns": [],
         "eur_extraction": {
           "pdf_patterns": [
-            "€\\s*(\\d\\s*\\d\\s*\\.\\s*\\d\\s*\\d)\\s+d\\s*u\\s*e",
-            "A\\s*m\\s*o\\s*u\\s*n\\s*t\\s+d\\s*u\\s*e\\s*€\\s*(\\d\\s*\\d\\s*\\.\\s*\\d\\s*\\d)"
+            "€\\s*(\\d+\\.\\d{2})\\s+due",
+            "Amount due\\s+€\\s*(\\d+\\.\\d{2})",
+            "€\\s*(\\d+(?:\\s*\\d)*\\s*\\.\\s*\\d\\s*\\d)\\s+d\\s*u\\s*e",
+            "A\\s*m\\s*o\\s*u\\s*n\\s*t\\s+d\\s*u\\s*e\\s*€\\s*(\\d+(?:\\s*\\d)*\\s*\\.\\s*\\d\\s*\\d)"
           ]
         },
         "email_patterns": []
       },
       "due_date_extraction": {
         "pdf_patterns": [
-          "D\\s*a\\s*t\\s*e\\s+d\\s*u\\s*e\\s*([A-Za-z\\s]+?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
-          "€\\s*\\d\\s*\\d\\s*\\.\\s*\\d\\s*\\d\\s+d\\s*u\\s*e\\s+([A-Za-z\\s]+?)\\s+(\\d\\s*\\d)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)"
+          "€\\d+\\.\\d{2}\\s+due\\s+([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
+          "Date due\\s+([A-Za-z]+)\\s+(\\d{1,2}),\\s+(\\d{4})",
+          "D\\s*a\\s*t\\s*e\\s+d\\s*u\\s*e\\s*([A-Za-z\\s]+?)\\s+(\\d+(?:\\s*\\d)*)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)",
+          "€\\s*\\d+(?:\\s*\\d)*\\s*\\.\\s*\\d\\s*\\d\\s+d\\s*u\\s*e\\s+([A-Za-z\\s]+?)\\s+(\\d+(?:\\s*\\d)*)\\s*,\\s+(\\d\\s*\\d\\s*\\d\\s*\\d)"
         ]
       }
     },
