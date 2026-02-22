@@ -941,12 +941,14 @@ class ManualInvoiceProcessor:
             classification = data.get('classification')
 
             # Get sheet description and payment type safely
+            # Use payment_type from data first (user's selection), then fall back to partner_rule
             if partner_rule:
                 sheet_description = partner_rule.get('sheet_description', data['partner_name'])
-                payment_type = partner_rule.get('payment_type', 'Vállalati számla')
             else:
                 sheet_description = data['partner_name']
-                payment_type = 'Vállalati számla'
+
+            # Use the user's selected payment type (from directory selection prompt)
+            payment_type = data.get('payment_type', 'Vállalati számla')
 
             email_data = {
                 'sender': '',
