@@ -594,10 +594,12 @@ class ManualInvoiceProcessor:
             else:
                 confirmed_data['due_date'] = None
 
-            # Confirm invoice date
+            # Confirm invoice date — default to the just-confirmed due date
+            # (invoice date and due date are identical in ~99% of cases)
+            invoice_date_default = due_date_str or data.get('invoice_date_display', '')
             invoice_date_str = self._prompt_for_field(
                 "Invoice Date (YYYY-MM-DD)",
-                data.get('invoice_date_display', ''),
+                invoice_date_default,
                 lambda x: self._is_valid_date(x)
             )
             try:
