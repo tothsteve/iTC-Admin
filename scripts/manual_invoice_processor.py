@@ -885,17 +885,17 @@ class ManualInvoiceProcessor:
 
     async def copy_to_dropbox(self, pdf_path: Path, new_filename: str,
                              data: Dict[str, Any]) -> Optional[str]:
-        """Copy file to Dropbox with proper folder structure."""
+        """Move file to Dropbox with proper folder structure."""
         try:
             print(f"\n📁 New filename: {new_filename}")
 
-            # Create temporary file with new name
-            temp_path = pdf_path.parent / new_filename
-            if temp_path != pdf_path:
+            # Rename source file in place (move semantics)
+            renamed_path = pdf_path.parent / new_filename
+            if renamed_path != pdf_path:
                 import shutil
-                shutil.copy2(pdf_path, temp_path)
+                shutil.move(str(pdf_path), str(renamed_path))
             else:
-                temp_path = pdf_path
+                renamed_path = pdf_path
 
             # Create mock email_data for copy_pdf
             email_data = {
@@ -906,27 +906,29 @@ class ManualInvoiceProcessor:
 
             classification = data.get('classification')
 
-            print(f"📂 Copying to Dropbox...")
+            print(f"📂 Moving to Dropbox...")
             dropbox_path = await self.dropbox_manager.copy_pdf(
-                temp_path,
+                renamed_path,
                 email_data,
                 classification
             )
 
-            # Clean up temp file if created
-            if temp_path != pdf_path:
-                temp_path.unlink()
-
             if dropbox_path:
-                print(f"✅ File copied to: {dropbox_path}")
+                # Remove source after successful copy to Dropbox (move semantics)
+                renamed_path.unlink()
+                print(f"✅ File moved to: {dropbox_path}")
                 return dropbox_path
             else:
-                print("❌ Failed to copy file to Dropbox")
+                # Restore original filename on failure
+                if renamed_path != pdf_path:
+                    import shutil
+                    shutil.move(str(renamed_path), str(pdf_path))
+                print("❌ Failed to move file to Dropbox")
                 return None
 
         except Exception as e:
-            print(f"❌ Dropbox copy failed: {e}")
-            self.logger.error(f"Dropbox copy error: {e}")
+            print(f"❌ Dropbox move failed: {e}")
+            self.logger.error(f"Dropbox move error: {e}")
             return None
 
     async def log_to_sheets(self, data: Dict[str, Any], dropbox_path: str) -> bool:
