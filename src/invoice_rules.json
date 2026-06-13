@@ -190,7 +190,7 @@
         "pdf_patterns": [
           "Összesen:\\s*\\n\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft",
           "Összesen:\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft",
-          "Végösszeg:\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft", 
+          "Végösszeg:\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft",
           "Fizetendő:\\s*(\\d+(?:\\s\\d{3})+)\\s*Ft",
           "Összesen:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
           "Végösszeg:\\s*(\\d+(?:\\.\\d{3})*(?:,\\d{2})?)\\s*Ft",
@@ -447,7 +447,10 @@
       "sheet_description": "Bérszámfejtés - Payroll",
       "folder_override": "berszamfejtes",
       "table_extraction": {
-        "files": ["Adoesjarulekbefizetesek*.pdf", "Bankiutalasok*.pdf"],
+        "files": [
+          "Adoesjarulekbefizetesek*.pdf",
+          "Bankiutalasok*.pdf"
+        ],
         "table_patterns": {
           "Adoesjarulekbefizetesek": {
             "start_marker": "Adó és járulék befizetések",
@@ -585,12 +588,36 @@
           "(\\d{1,2})/(\\d{1,2})/(\\d{4})"
         ]
       }
+    },
+    {
+      "name": "Szlavitsek_Szilvia_Coach",
+      "email_patterns": [
+        "szilviaszlavitsek@yahoo.com"
+      ],
+      "subject_patterns": [
+        "számla"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Coach",
+      "sheet_description": "Szlavitsek_Szilvia_Coach",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Összesen:[\\s\\n]*(\\d+(?:\\s\\d{3})*)\\s*Ft"
+        ]
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
     }
   ],
   "exclusion_rules": [
     {
       "name": "Atlassian Invoices",
-      "description": "Exclude Atlassian payment confirmations", 
+      "description": "Exclude Atlassian payment confirmations",
       "email_patterns": [
         "no_reply@am.atlassian.com"
       ],
@@ -635,7 +662,7 @@
     "current_year": 2026,
     "folder_structure": {
       "kiadas_penztár": "Pénztár",
-      "kiadas_vallalati": "Bejövő", 
+      "kiadas_vallalati": "Bejövő",
       "bevetel_vallalati": "income_business",
       "berszamfejtes": "Cégiratok/Berpapirok"
     },
@@ -643,10 +670,25 @@
       "spreadsheet_id": "19jOXzcfCVgzYflXa_XAXNDfxANiQraQD-MFvrmnazDI",
       "worksheet_template": "{year}",
       "columns": {
-        "kiadas_vallalati": {"target": "Kiadás HUF"},
-        "kiadas_penztár": {"target": "Kiadás HUF"},
-        "bevetel_vallalati": {"target": "Bevétel HUF"}
+        "kiadas_vallalati": {
+          "target": "Kiadás HUF"
+        },
+        "kiadas_penztár": {
+          "target": "Kiadás HUF"
+        },
+        "bevetel_vallalati": {
+          "target": "Bevétel HUF"
+        }
       }
-    }
+    },
+    "label_triggers": {
+      "ITC/Process-Vallalati": "kiadas_vallalati",
+      "ITC/Process-Penztar": "kiadas_penztár"
+    },
+    "learn_triggers": {
+      "ITC/Learn-Vallalati": "kiadas_vallalati",
+      "ITC/Learn-Penztar": "kiadas_penztár"
+    },
+    "processed_label": "ITC/Processed"
   }
 }

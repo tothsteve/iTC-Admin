@@ -431,7 +431,186 @@ class InvoiceRulesEngine:
         
         folder_path = Path(base_folder) / str(current_year) / folder_name
         return str(folder_path)
-    
+
+    # Payment type per invoice type (used by label-trigger overrides)
+    _PAYMENT_TYPE_BY_INVOICE_TYPE = {
+        'kiadas_vallalati': 'Vállalati számla',
+        'kiadas_penztár': 'Saját',
+        'bevetel_vallalati': 'Vállalati számla',
+    }
+
+    def payment_type_for(self, invoice_type: str) -> str:
+        """Public accessor for the payment type of an invoice type."""
+        return self._PAYMENT_TYPE_BY_INVOICE_TYPE.get(invoice_type, 'Vállalati számla')
+
+    def apply_type_override(self, classification: "InvoiceClassification", invoice_type: str) -> "InvoiceClassification":
+        """Force a specific invoice_type on an existing classification (label-trigger).
+
+        Keeps partner detection (prefix, extraction patterns, sheet_description) intact but
+        redirects the destination folder + payment type to the user-chosen type.
+        """
+        classification.invoice_type = invoice_type
+        classification.folder_path = self._get_folder_path(invoice_type)
+        classification.payment_type = self._PAYMENT_TYPE_BY_INVOICE_TYPE.get(
+            invoice_type, classification.payment_type
+        )
+        logger.info(f"🏷️  Applied type override: {invoice_type} → folder {classification.folder_path}")
+        return classification
+
+    def fallback_classification(self, email_data: Dict[str, Any], invoice_type: str) -> "InvoiceClassification":
+        """Build a minimal classification when no partner rule matches (label-trigger).
+
+        Lets a manually-labeled email of an unknown partner still be processed with the
+        chosen type, using the default_rule extraction patterns.
+        """
+        sender = email_data.get('sender', '')
+        # Derive a readable partner name from the sender domain, else "Egyéb"
+        partner_name = "Egyéb"
+        if '@' in sender:
+            domain = sender.split('@')[-1].strip('>').strip()
+            if domain:
+                partner_name = domain
+        classification = InvoiceClassification(
+            partner_name=partner_name,
+            invoice_type=invoice_type,
+            payment_type=self._PAYMENT_TYPE_BY_INVOICE_TYPE.get(invoice_type, 'Vállalati számla'),
+            folder_path=self._get_folder_path(invoice_type),
+            # >0.5 so the integrated_workflow PDF-extraction gate runs default_rule patterns
+            confidence=0.6,
+            matched_patterns=["label-trigger fallback"],
+        )
+        logger.info(f"🏷️  Fallback classification: {partner_name} ({invoice_type}) via label-trigger")
+        return classification
+
+    # ------------------------------------------------------------------
+    # Rule learning (ITC/Learn-* labels): generate patterns + persist rule
+    # ------------------------------------------------------------------
+
+    # Matches a Hungarian-formatted amount: 1 234 567,89 / 1.234.567 / 12345
+    _AMOUNT_NUM_RE = r'(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?|\d+)'
+
+    def _amount_text_forms(self, amount: float) -> List[str]:
+        """Plausible textual renderings of an integer amount, longest first."""
+        n = int(round(amount))
+        grouped_space = f"{n:,}".replace(",", " ")   # 1 234 567
+        grouped_dot = f"{n:,}".replace(",", ".")      # 1.234.567
+        forms = {str(n), grouped_space, grouped_dot}
+        return sorted(forms, key=len, reverse=True)
+
+    def generate_amount_pattern(self, pdf_text: str, amount: float) -> Optional[str]:
+        """Build an amount-extraction regex by locating the confirmed amount + its label.
+
+        Returns a regex with one capture group, or None if the amount is not found
+        verbatim in the text.
+        """
+        if not amount or not pdf_text:
+            return None
+        for form in self._amount_text_forms(amount):
+            idx = pdf_text.find(form)
+            if idx == -1:
+                continue
+            prefix = pdf_text[max(0, idx - 50):idx]
+            # Trailing label word(s) right before the number (e.g. "Fizetendő összeg:")
+            label_match = re.search(r'([A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű][A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű .]{2,30}?)\s*[:=]?\s*$', prefix)
+            label = label_match.group(1).strip() if label_match else ''
+            # Trailing currency (Ft / HUF) right after the number
+            suffix = pdf_text[idx + len(form): idx + len(form) + 6]
+            cur_match = re.search(r'^\s*(Ft|HUF)', suffix, re.IGNORECASE)
+            currency = cur_match.group(1) if cur_match else ''
+            pat = ''
+            if label:
+                pat += re.escape(label) + r'\s*[:=]?\s*'
+            pat += self._AMOUNT_NUM_RE
+            if currency:
+                pat += r'\s*' + re.escape(currency)
+            # Require at least a label or a currency anchor to avoid matching any number
+            if label or currency:
+                return pat
+        return None
+
+    def generate_date_pattern(self, pdf_text: str, due_date_yyyymmdd: str) -> Optional[str]:
+        """Build a due-date regex from a confirmed YYYYMMDD date if it appears in the text.
+
+        Returns a regex producing a capture group matching the date string, else None.
+        """
+        if not due_date_yyyymmdd or len(due_date_yyyymmdd) != 8 or not pdf_text:
+            return None
+        y, m, d = due_date_yyyymmdd[:4], due_date_yyyymmdd[4:6], due_date_yyyymmdd[6:8]
+        # Common renderings of the date
+        candidates = [
+            (f"{y}.{m}.{d}", r'(\d{4}\.\d{2}\.\d{2})'),
+            (f"{y}-{m}-{d}", r'(\d{4}-\d{2}-\d{2})'),
+            (f"{y}. {int(m)}. {int(d)}", r'(\d{4}\.\s*\d{1,2}\.\s*\d{1,2})'),
+            (f"{int(m)}/{int(d)}/{y}", r'(\d{1,2})/(\d{1,2})/(\d{4})'),
+        ]
+        for literal, num_re in candidates:
+            idx = pdf_text.find(literal)
+            if idx == -1:
+                continue
+            prefix = pdf_text[max(0, idx - 50):idx]
+            label_match = re.search(r'([A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű][A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű .]{2,30}?)\s*[:=]?\s*$', prefix)
+            label = label_match.group(1).strip() if label_match else ''
+            pat = (re.escape(label) + r'\s*[:=]?\s*' if label else '') + num_re
+            return pat
+        return None
+
+    def collect_amount_patterns(self) -> List[str]:
+        """All amount pdf_patterns across existing rules + default_rule (deduped)."""
+        out = []
+        for rule in list(self.rules.values()) + [getattr(self, 'default_rule', {})]:
+            for pat in rule.get('amount_extraction', {}).get('pdf_patterns', []):
+                if pat not in out:
+                    out.append(pat)
+        return out
+
+    def collect_date_patterns(self) -> List[str]:
+        """All due-date pdf_patterns across existing rules (deduped)."""
+        out = []
+        for rule in self.rules.values():
+            for pat in rule.get('due_date_extraction', {}).get('pdf_patterns', []):
+                if pat not in out:
+                    out.append(pat)
+        return out
+
+    def create_partner_rule(self, rule: Dict[str, Any]) -> bool:
+        """Append a new partner rule to memory and persist it to the rules JSON file.
+
+        Writes a timestamp-free .bak backup of the previous file first.
+        """
+        name = rule.get('name')
+        if not name:
+            logger.error("Cannot create rule without a name")
+            return False
+        try:
+            with open(self.rules_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+            # Replace existing rule with same name, else append
+            rules_list = config.get('rules', [])
+            rules_list = [r for r in rules_list if r.get('name') != name]
+            rules_list.append(rule)
+            config['rules'] = rules_list
+
+            backup = self.rules_file.with_suffix(self.rules_file.suffix + '.bak')
+            with open(backup, 'w', encoding='utf-8') as f:
+                json.dump({'rules': self.rules and list(self.rules.values()) or [],
+                           'exclusion_rules': getattr(self, 'exclusion_rules', []),
+                           'default_rule': getattr(self, 'default_rule', {}),
+                           'settings': self.settings}, f, ensure_ascii=False, indent=2)
+
+            with open(self.rules_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+                f.write('\n')
+
+            # Update in-memory rules
+            self.rules[name] = rule
+            logger.info(f"✅ Created and persisted partner rule: {name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to persist rule {name}: {e}")
+            return False
+
     def get_google_sheets_config(self, invoice_type: str, year: int = None) -> Dict[str, str]:
         """Get Google Sheets configuration for invoice type and year"""
         if not year:

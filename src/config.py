@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # tolerate extra .env keys (e.g. APARTMENT_*) used by other scripts
 
 
 # Global settings instance
