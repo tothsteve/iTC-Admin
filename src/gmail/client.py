@@ -435,6 +435,34 @@ class GmailClient:
             logger.error(f"Failed to remove label {label_name} from {message_id}: {e}")
             return False
 
+    async def add_thread_label(self, thread_id: str, label_name: str) -> bool:
+        """Add a user label to a whole thread (creating the label if needed)."""
+        try:
+            label_id = await self.ensure_label(label_name)
+            if not label_id:
+                return False
+            self.service.users().threads().modify(
+                userId='me', id=thread_id, body={'addLabelIds': [label_id]}
+            ).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add label {label_name} to thread {thread_id}: {e}")
+            return False
+
+    async def remove_thread_label(self, thread_id: str, label_name: str) -> bool:
+        """Remove a user label from a whole thread (no-op if the label is missing)."""
+        try:
+            label_id = await self.ensure_label(label_name)
+            if not label_id:
+                return False
+            self.service.users().threads().modify(
+                userId='me', id=thread_id, body={'removeLabelIds': [label_id]}
+            ).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to remove label {label_name} from thread {thread_id}: {e}")
+            return False
+
     def _build_search_query(self, since_time: datetime) -> str:
         """Build Gmail search query based on configuration."""
         query_parts = []

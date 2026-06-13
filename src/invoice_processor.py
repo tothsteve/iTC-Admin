@@ -439,6 +439,10 @@ class InvoiceRulesEngine:
         'bevetel_vallalati': 'Vállalati számla',
     }
 
+    def payment_type_for(self, invoice_type: str) -> str:
+        """Public accessor for the payment type of an invoice type."""
+        return self._PAYMENT_TYPE_BY_INVOICE_TYPE.get(invoice_type, 'Vállalati számla')
+
     def apply_type_override(self, classification: "InvoiceClassification", invoice_type: str) -> "InvoiceClassification":
         """Force a specific invoice_type on an existing classification (label-trigger).
 
@@ -596,6 +600,7 @@ class InvoiceRulesEngine:
 
             with open(self.rules_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
+                f.write('\n')
 
             # Update in-memory rules
             self.rules[name] = rule

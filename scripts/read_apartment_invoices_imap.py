@@ -224,7 +224,6 @@ def main():
     amount_patterns = rules.collect_amount_patterns()
 
     results = []
-    import urllib.parse
     for mid in ids:
         typ, mdata = imap.fetch(mid, '(RFC822)')
         if typ != 'OK' or not mdata or not mdata[0]:

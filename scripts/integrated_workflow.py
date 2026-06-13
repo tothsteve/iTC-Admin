@@ -177,9 +177,11 @@ class IntegratedWorkflow:
                 if success:
                     processed_count += 1
                     # Remove trigger label so it is not reprocessed; mark as processed
-                    await self.gmail_client.remove_label(email['id'], label_name)
+                    # (thread-level so the label clears across the whole conversation)
+                    tid = email.get('thread_id', email['id'])
+                    await self.gmail_client.remove_thread_label(tid, label_name)
                     if processed_label:
-                        await self.gmail_client.add_label(email['id'], processed_label)
+                        await self.gmail_client.add_thread_label(tid, processed_label)
                 else:
                     print(f"   ⚠️  Failed - keeping label {label_name} on message {email['id']}")
 
@@ -240,9 +242,10 @@ class IntegratedWorkflow:
                 success = await self.process_single_email(email, type_override=invoice_type)
                 if success:
                     learned += 1
-                    await self.gmail_client.remove_label(email['id'], label_name)
+                    tid = email.get('thread_id', email['id'])
+                    await self.gmail_client.remove_thread_label(tid, label_name)
                     if processed_label:
-                        await self.gmail_client.add_label(email['id'], processed_label)
+                        await self.gmail_client.add_thread_label(tid, processed_label)
                 else:
                     print(f"   ⚠️  Processing failed - keeping label {label_name}")
 
@@ -312,7 +315,7 @@ class IntegratedWorkflow:
             'email_patterns': [email_pat],
             'subject_patterns': [subj_pat] if subj_pat else [],
             'invoice_type': invoice_type,
-            'payment_type': self.rules_engine._PAYMENT_TYPE_BY_INVOICE_TYPE.get(invoice_type, 'Vállalati számla'),
+            'payment_type': self.rules_engine.payment_type_for(invoice_type),
             'filename_prefix': prefix,
             'sheet_description': desc,
         }

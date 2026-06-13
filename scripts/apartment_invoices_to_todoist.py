@@ -149,7 +149,8 @@ def existing_invoice_keys(token, project_id):
         data = r.json()
         tasks = data.get('results', []) if isinstance(data, dict) else data
         for t in tasks:
-            m = re.search(r'(\d[\d . ]*)\s*Ft', t.get('content', ''))
+            content = t.get('content', '')
+            m = re.search(r'(\d[\d . ]*)\s*Ft', content)
             amt = parse_huf(m.group(1)) if m else None
             due = None
             if t.get('due') and t['due'].get('date'):
@@ -158,8 +159,11 @@ def existing_invoice_keys(token, project_id):
                 md = re.search(r'(?i)határid[őo]:?\s*(\d{4}-\d{2}-\d{2})', t.get('description', ''))
                 if md:
                     due = md.group(1)
+            # property = word after the emoji, before " – " (content: "{emoji} {prop} – {label} {amt} Ft")
+            head = content.split(' – ')[0].split()
+            prop = head[-1] if head else '?'
             if amt and due:
-                keys.add(f'{amt}|{due}')
+                keys.add(f'{prop}|{amt}|{due}')
         cursor = data.get('next_cursor') if isinstance(data, dict) else None
         if not cursor:
             break
@@ -192,6 +196,10 @@ def add_absolute_reminders(token, task_id, datetimes):
     r = requests.post(SYNC, headers=todoist_headers(token),
                       json={'commands': commands}, timeout=30)
     r.raise_for_status()
+    # Sync API returns HTTP 200 even when individual commands fail — check sync_status.
+    bad = {k: v for k, v in r.json().get('sync_status', {}).items() if v != 'ok'}
+    if bad:
+        raise RuntimeError(f"Todoist reminder sync errors: {bad}")
 
 
 def main():
@@ -238,7 +246,7 @@ def main():
 
     for inv in invoices:
         key = inv['msgid']
-        inv_key = f"{inv['amount']}|{inv['due']}"
+        inv_key = f"{inv['property']}|{inv['amount']}|{inv['due']}"
         if key in state or inv_key in existing:
             why = "state" if key in state else "Todoist-ban már létezik"
             print(f"⏭️  Kihagyva ({why}): {inv['subject'][:50]}")

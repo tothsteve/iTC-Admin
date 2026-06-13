@@ -222,7 +222,6 @@ async def main():
 
     rules = create_rules_engine()
     amount_patterns = rules.collect_amount_patterns()
-    date_patterns = rules.collect_date_patterns()  # noqa: F841 (kept for future use)
 
     results = []
     for email in emails:
