@@ -44,7 +44,7 @@ import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
 from read_apartment_invoices_imap import (
-    IMAP_HOST, IMAP_PORT, decode_subject, get_body_and_pdfs,
+    IMAP_HOST, IMAP_PORT, decode_subject, get_body_and_pdfs, build_gmail_link,
 )
 from read_apartment_invoices import (
     create_rules_engine, extract_amount, extract_due_date, detect_property,
@@ -111,8 +111,7 @@ def collect_unread(email_addr, app_pw, folder, max_n=50):
         subject = decode_subject(msg.get('Subject', ''))
         sender = decode_subject(msg.get('From', ''))
         rfc_id = (msg.get('Message-ID') or '').strip()
-        link = ('https://mail.google.com/mail/u/0/#search/'
-                + urllib.parse.quote('rfc822msgid:' + rfc_id)) if rfc_id else ''
+        link = build_gmail_link(rfc_id)
         body, pdfs = get_body_and_pdfs(msg)
         text = body
         for _, payload in pdfs:

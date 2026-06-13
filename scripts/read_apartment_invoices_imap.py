@@ -41,6 +41,18 @@ from read_apartment_invoices import (  # reuse extraction helpers
 IMAP_HOST = 'imap.gmail.com'
 IMAP_PORT = 993
 
+# Which Gmail account index the deep links open in the browser (tistvan87 = u/2).
+GMAIL_USER_INDEX = os.environ.get('APARTMENT_GMAIL_INDEX', '2')
+
+
+def build_gmail_link(rfc_id: str) -> str:
+    """Gmail deep link to a message by RFC822 Message-ID, in the right account index."""
+    import urllib.parse
+    if not rfc_id:
+        return ''
+    return (f'https://mail.google.com/mail/u/{GMAIL_USER_INDEX}/#search/'
+            + urllib.parse.quote('rfc822msgid:' + rfc_id.strip()))
+
 
 def decode_mutf7(name: str) -> str:
     """Decode IMAP modified UTF-7 mailbox name to unicode (best effort)."""
@@ -221,8 +233,7 @@ def main():
         subject = decode_subject(msg.get('Subject', ''))
         sender = decode_subject(msg.get('From', ''))
         rfc_id = (msg.get('Message-ID') or '').strip()
-        gmail_link = ('https://mail.google.com/mail/u/0/#search/'
-                      + urllib.parse.quote('rfc822msgid:' + rfc_id)) if rfc_id else ''
+        gmail_link = build_gmail_link(rfc_id)
         print(f"📧 {subject[:60]}  ({sender})")
 
         body, pdfs = get_body_and_pdfs(msg)
