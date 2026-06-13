@@ -98,3 +98,6 @@ coverage.xml
 *.jpeg
 *.tiff
 *.bmp
+# Apartment→Todoist runtime state + rule backups (per-machine, not versioned)
+data/processed_apartment_invoices.json
+*.json.bak
