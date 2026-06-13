@@ -24,6 +24,7 @@ Usage:
 
 import sys
 import os
+import re
 import json
 import email
 import imaplib
@@ -47,13 +48,13 @@ from read_apartment_invoices_imap import (
 )
 from read_apartment_invoices import (
     create_rules_engine, extract_amount, extract_due_date, detect_property,
-    extract_pdf_text,
+    extract_pdf_text, parse_huf,
 )
 
 DEFAULT_PROJECT_ID = '6f7qmf8FWc9F4Rxm'  # 🏡 Otthon
 STATE_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed_apartment_invoices.json')
-REST = 'https://api.todoist.com/rest/v2'
-SYNC = 'https://api.todoist.com/sync/v9/sync'
+REST = 'https://api.todoist.com/api/v1'
+SYNC = 'https://api.todoist.com/api/v1/sync'
 
 # Sender substring -> (emoji, type label). Extend as new vendors appear.
 VENDOR_TYPES = [
@@ -133,12 +134,45 @@ def todoist_headers(token):
     return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
 
 
+def existing_invoice_keys(token, project_id):
+    """Fetch the project's tasks and return a set of 'amount|due' keys, so we never
+    duplicate an invoice that already has a task (even if the state file was wiped).
+    Matches both script-created and hand-created tasks via amount + due date."""
+    keys = set()
+    cursor = None
+    while True:
+        params = {'project_id': project_id}
+        if cursor:
+            params['cursor'] = cursor
+        r = requests.get(f'{REST}/tasks', headers=todoist_headers(token),
+                         params=params, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        tasks = data.get('results', []) if isinstance(data, dict) else data
+        for t in tasks:
+            m = re.search(r'(\d[\d . ]*)\s*Ft', t.get('content', ''))
+            amt = parse_huf(m.group(1)) if m else None
+            due = None
+            if t.get('due') and t['due'].get('date'):
+                due = t['due']['date'][:10]
+            if not due:
+                md = re.search(r'(?i)határid[őo]:?\s*(\d{4}-\d{2}-\d{2})', t.get('description', ''))
+                if md:
+                    due = md.group(1)
+            if amt and due:
+                keys.add(f'{amt}|{due}')
+        cursor = data.get('next_cursor') if isinstance(data, dict) else None
+        if not cursor:
+            break
+    return keys
+
+
 def create_task(token, project_id, content, description, due_date, priority):
-    """priority: REST 1..4 (4=urgent). Returns task id."""
+    """priority: 1..4 (4=urgent). Returns task id."""
     payload = {'content': content, 'description': description,
                'project_id': project_id, 'priority': priority}
     if due_date:
-        payload['due_date'] = due_date
+        payload['due_string'] = due_date  # ISO date string, e.g. "2026-06-30"
     r = requests.post(f'{REST}/tasks', headers=todoist_headers(token), json=payload, timeout=30)
     r.raise_for_status()
     return r.json()['id']
@@ -195,10 +229,20 @@ def main():
     today = datetime.now().date()
     created, skipped = 0, 0
 
+    # Todoist-side dedup: existing tasks by amount|due (survives state-file loss)
+    existing = set()
+    if token:
+        try:
+            existing = existing_invoice_keys(token, args.project_id)
+        except Exception as e:
+            print(f"⚠️  Nem sikerült lekérni a meglévő Todoist feladatokat: {e}")
+
     for inv in invoices:
         key = inv['msgid']
-        if key in state:
-            print(f"⏭️  Már feldolgozva: {inv['subject'][:50]}")
+        inv_key = f"{inv['amount']}|{inv['due']}"
+        if key in state or inv_key in existing:
+            why = "state" if key in state else "Todoist-ban már létezik"
+            print(f"⏭️  Kihagyva ({why}): {inv['subject'][:50]}")
             skipped += 1
             continue
         if not inv['amount'] or not inv['due']:
@@ -233,6 +277,7 @@ def main():
         add_absolute_reminders(token, task_id, reminder_dts)
         state[key] = {'task_id': task_id, 'created_at': today.isoformat(),
                       'subject': inv['subject'], 'amount': inv['amount'], 'due': inv['due']}
+        existing.add(inv_key)
         created += 1
 
     if not args.dry_run:
