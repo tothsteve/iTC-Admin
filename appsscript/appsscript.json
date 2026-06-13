@@ -1,0 +1,22 @@
+{
+  "timeZone": "Europe/Budapest",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.current.message.metadata",
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://mail.google.com/"
+  ],
+  "gmail": {
+    "name": "ITC-Admin Invoice Tagger",
+    "logoUrl": "https://www.gstatic.com/images/icons/material/system/2x/receipt_black_48dp.png",
+    "primaryColor": "#1a73e8",
+    "secondaryColor": "#1a73e8",
+    "contextualTriggers": [
+      {
+        "unconditional": {},
+        "onTriggerFunction": "onGmailMessageOpen"
+      }
+    ]
+  }
+}

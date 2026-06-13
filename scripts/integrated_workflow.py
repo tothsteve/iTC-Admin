@@ -149,9 +149,243 @@ class IntegratedWorkflow:
         except Exception as e:
             print(f"❌ Error processing emails: {e}")
             return 0
-    
-    async def process_single_email(self, email: dict) -> bool:
-        """Process a single email through the complete workflow."""
+
+    async def process_labeled_emails(self) -> int:
+        """Process emails tagged with ITC/Process-* labels (label-trigger mode).
+
+        Each label maps to an invoice_type via settings.label_triggers. After a
+        successful run the trigger label is removed and the processed_label is added.
+        """
+        settings = self.rules_engine.settings
+        label_triggers = settings.get('label_triggers', {})
+        processed_label = settings.get('processed_label')
+
+        if not label_triggers:
+            print("⚠️  No label_triggers configured in settings - nothing to do")
+            return 0
+
+        print(f"\\n🏷️  Label-trigger mode: scanning {len(label_triggers)} trigger label(s)")
+
+        processed_count = 0
+        for label_name, invoice_type in label_triggers.items():
+            print(f"\\n🔎 Checking label: {label_name} → {invoice_type}")
+            emails = await self.gmail_client.get_emails_by_label(label_name)
+            print(f"   Found {len(emails)} email(s) with this label")
+
+            for email in emails:
+                success = await self.process_single_email(email, type_override=invoice_type)
+                if success:
+                    processed_count += 1
+                    # Remove trigger label so it is not reprocessed; mark as processed
+                    await self.gmail_client.remove_label(email['id'], label_name)
+                    if processed_label:
+                        await self.gmail_client.add_label(email['id'], processed_label)
+                else:
+                    print(f"   ⚠️  Failed - keeping label {label_name} on message {email['id']}")
+
+        print(f"\\n✅ Label-trigger run complete: processed {processed_count} email(s)")
+        return processed_count
+
+    async def process_learn_emails(self) -> int:
+        """Process emails tagged with ITC/Learn-* labels: interactively create a new
+        partner rule from the email + PDF, persist it, then process the email.
+        """
+        import tempfile
+
+        settings = self.rules_engine.settings
+        learn_triggers = settings.get('learn_triggers', {})
+        processed_label = settings.get('processed_label')
+
+        if not learn_triggers:
+            print("⚠️  No learn_triggers configured in settings - nothing to do")
+            return 0
+
+        print(f"\\n🎓 Learn mode: scanning {len(learn_triggers)} learn label(s)")
+
+        learned = 0
+        for label_name, invoice_type in learn_triggers.items():
+            print(f"\\n🔎 Checking label: {label_name} → {invoice_type}")
+            emails = await self.gmail_client.get_emails_by_label(label_name)
+            print(f"   Found {len(emails)} email(s) with this label")
+
+            for email in emails:
+                pdfs = email.get('pdf_attachments', [])
+                if not pdfs:
+                    print(f"   ⚠️  No PDF on '{email['subject'][:40]}' - skipping")
+                    continue
+
+                att = pdfs[0]
+                data = await self.gmail_client.download_attachment(
+                    email['id'], att['attachment_id'], att['filename']
+                )
+                if not data:
+                    print("   ⚠️  PDF download failed - skipping")
+                    continue
+
+                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tf:
+                    tf.write(data)
+                    tmp = Path(tf.name)
+                pdf_text = self._extract_pdf_text(tmp)
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
+
+                partner = self._build_rule_interactively(email, pdf_text or "", invoice_type)
+                if not partner:
+                    print("   ⏭️  Skipped (no rule created)")
+                    continue
+
+                # Process the email with the freshly-created rule (validates patterns E2E)
+                success = await self.process_single_email(email, type_override=invoice_type)
+                if success:
+                    learned += 1
+                    await self.gmail_client.remove_label(email['id'], label_name)
+                    if processed_label:
+                        await self.gmail_client.add_label(email['id'], processed_label)
+                else:
+                    print(f"   ⚠️  Processing failed - keeping label {label_name}")
+
+        print(f"\\n✅ Learn run complete: created/processed {learned} partner(s)")
+        return learned
+
+    def _build_rule_interactively(self, email: dict, pdf_text: str, invoice_type: str):
+        """Interactively assemble + persist a new partner rule. Returns partner name or None."""
+        import re
+        import json as _json
+
+        print("\\n" + "=" * 60)
+        print("🎓 ÚJ PARTNER TANÍTÁSA")
+        print("=" * 60)
+        sender = email.get('sender', '')
+        subject = email.get('subject', '')
+        print(f"   Feladó: {sender}")
+        print(f"   Tárgy:  {subject}")
+        print(f"   PDF szöveg (első 400 karakter):\\n{pdf_text[:400]}\\n")
+
+        # Parse sender address + display name
+        m = re.search(r'<([^>]+)>', sender)
+        addr = m.group(1).strip() if m else sender.strip()
+        display = sender.split('<')[0].strip().strip('"') if '<' in sender else ''
+        domain = addr.split('@')[-1] if '@' in addr else addr
+        default_name = display or domain or 'Egyéb'
+
+        name = input(f"   Partner neve [{default_name}]: ").strip() or default_name
+        email_pat = input(f"   Email minta [{addr}]: ").strip() or addr
+        subj_default = subject[:40]
+        print("   Tárgy minta: Enter=email tárgya, '-'=nincs (csak feladó alapján), vagy írj sajátot")
+        subj_in = input(f"   Tárgy minta [{subj_default}]: ").strip()
+        if subj_in == '-':
+            subj_pat = ''
+        else:
+            subj_pat = subj_in or subj_default
+        prefix_default = (re.sub(r'[^A-Za-z0-9]', '', (display or domain).split('.')[0]).capitalize()[:12]) or 'Szamla'
+        prefix = input(f"   Fájl prefix [{prefix_default}]: ").strip() or prefix_default
+        desc = input(f"   Megjegyzés (Sheets) [{name}]: ").strip() or name
+
+        # Amount: auto-detect via default_rule, then confirm
+        tmp_class = self.rules_engine.fallback_classification(email, invoice_type)
+        amt_hint = self.rules_engine.extract_amount(email, pdf_text, tmp_class)
+        amt_in = input(f"   Összeg (HUF) [{int(amt_hint) if amt_hint else ''}]: ").strip()
+        amount = None
+        if amt_in:
+            digits = re.sub(r'[^\\d]', '', amt_in.split(',')[0])
+            amount = int(digits) if digits else None
+        elif amt_hint:
+            amount = int(amt_hint)
+
+        amount_pattern = self._choose_pattern(
+            "Összeg", pdf_text,
+            self.rules_engine.generate_amount_pattern(pdf_text, amount) if amount else None,
+            self.rules_engine.collect_amount_patterns())
+
+        # Due date
+        dd_in = input("   Esedékesség (YYYY-MM-DD, Enter=ma): ").strip()
+        due_yyyymmdd = dd_in.replace('-', '') if dd_in else datetime.now().strftime('%Y%m%d')
+        date_pattern = self._choose_pattern(
+            "Dátum", pdf_text,
+            self.rules_engine.generate_date_pattern(pdf_text, due_yyyymmdd),
+            self.rules_engine.collect_date_patterns())
+
+        rule = {
+            'name': name,
+            'email_patterns': [email_pat],
+            'subject_patterns': [subj_pat] if subj_pat else [],
+            'invoice_type': invoice_type,
+            'payment_type': self.rules_engine._PAYMENT_TYPE_BY_INVOICE_TYPE.get(invoice_type, 'Vállalati számla'),
+            'filename_prefix': prefix,
+            'sheet_description': desc,
+        }
+        if amount_pattern:
+            rule['amount_extraction'] = {'method': 'pdf', 'pdf_patterns': [amount_pattern]}
+        if date_pattern:
+            rule['due_date_extraction'] = {'pdf_patterns': [date_pattern]}
+
+        print("\\n   ── ÚJ RULE ──")
+        print(_json.dumps(rule, ensure_ascii=False, indent=2))
+        ok = input("\\n   Mentés? (Y/n): ").strip().lower()
+        if ok and ok != 'y':
+            return None
+
+        if self.rules_engine.create_partner_rule(rule):
+            print(f"   ✅ Rule mentve: {name}")
+            return name
+        print("   ❌ Rule mentés sikertelen")
+        return None
+
+    def _choose_pattern(self, kind: str, pdf_text: str, generated, existing):
+        """Offer the auto-generated pattern + any existing rule patterns that match
+        this PDF; let the user pick by number, type a raw regex, then edit. Returns
+        the chosen regex string or None.
+        """
+        import re
+
+        options = []  # list of (description, pattern)
+        seen = set()
+        if generated:
+            options.append(("auto-generált", generated))
+            seen.add(generated)
+        for pat in existing:
+            if pat in seen:
+                continue
+            try:
+                m = re.search(pat, pdf_text, re.IGNORECASE | re.MULTILINE)
+            except re.error:
+                continue
+            if m:
+                val = m.group(1) if m.groups() else m.group(0)
+                options.append((f"létező, talált: {val}", pat))
+                seen.add(pat)
+
+        print(f"\\n   {kind} minta jelöltek:")
+        if options:
+            for i, (desc, pat) in enumerate(options, 1):
+                print(f"     {i}. [{desc}] {pat}")
+            print("     (szám = választ | üres = 1. | vagy írj be saját regexet | '-' = nincs)")
+        else:
+            print("     (nincs jelölt — írj be saját regexet, vagy '-'/üres = nincs)")
+
+        choice = input(f"   {kind} választás: ").strip()
+        if choice == '-':
+            return None
+        if not choice:
+            chosen = options[0][1] if options else None
+        elif choice.isdigit() and 1 <= int(choice) <= len(options):
+            chosen = options[int(choice) - 1][1]
+        else:
+            chosen = choice  # treat as a raw regex
+
+        if not chosen:
+            return None
+        edited = input(f"   Szerkeszthető [{chosen}]: ").strip()
+        return edited or chosen
+
+    async def process_single_email(self, email: dict, type_override: str = None) -> bool:
+        """Process a single email through the complete workflow.
+
+        type_override: when set (label-trigger mode), forces the invoice_type
+        (e.g. 'kiadas_vallalati' / 'kiadas_penztár') regardless of partner defaults.
+        """
         print(f"\\n📧 Processing: {email['subject'][:50]}...")
         print(f"   From: {email['sender']}")
         print(f"   PDFs: {len(email.get('pdf_attachments', []))}")
@@ -181,12 +415,19 @@ class IntegratedWorkflow:
             
             # Classify email using rules engine
             classification = self.rules_engine.classify_email(email)
-            
-            # Skip if no matching rule found
-            if classification is None:
+
+            if type_override:
+                # Label-trigger mode: user picked the type explicitly
+                if classification is None:
+                    print(f"   🏷️  No partner rule matched - using fallback classification")
+                    classification = self.rules_engine.fallback_classification(email, type_override)
+                else:
+                    classification = self.rules_engine.apply_type_override(classification, type_override)
+            elif classification is None:
+                # Auto mode: skip if no matching rule found
                 print(f"   ⏭️  Skipping - no matching rule found")
                 return True  # Return True to indicate successful handling (by skipping)
-            
+
             print(f"   🏷️  Partner: {classification.partner_name} (confidence: {classification.confidence:.2f})")
             print(f"   🎯 Matched: {', '.join(classification.matched_patterns)}")
             print(f"   💰 Invoice Type: {classification.invoice_type}")
@@ -865,6 +1106,9 @@ async def main():
     parser.add_argument("--hours", type=int, default=24, help="Hours back to check (default: 24)")
     parser.add_argument("--interval", type=int, default=10, help="Check interval in minutes (default: 10)")
     parser.add_argument("--stats", action="store_true", help="Show processing statistics")
+    parser.add_argument("--mode", choices=["auto", "labels", "learn"], default="auto",
+                        help="auto: time-based PDF scan (default); labels: process ITC/Process-* labeled emails; "
+                             "learn: interactively create a partner rule from ITC/Learn-* labeled emails")
     
     args = parser.parse_args()
     
@@ -896,7 +1140,15 @@ async def main():
                     print(f"  {key}: {value}")
         return
     
-    if args.once:
+    if args.mode == "labels":
+        print(f"\\n🏷️  Label-trigger mode")
+        processed = await workflow.process_labeled_emails()
+        print(f"\\n✅ Processed {processed} labeled emails")
+    elif args.mode == "learn":
+        print(f"\\n🎓 Learn mode (interactive)")
+        learned = await workflow.process_learn_emails()
+        print(f"\\n✅ Learned/processed {learned} partner(s)")
+    elif args.once:
         print(f"\\n🔍 Single run mode - checking last {args.hours} hours")
         processed = await workflow.process_emails_once(hours_back=args.hours)
         print(f"\\n✅ Processed {processed} emails")

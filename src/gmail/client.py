@@ -331,6 +331,110 @@ class GmailClient:
             logger.error(f"Failed to mark message {message_id} as processed: {e}")
             return False
     
+    async def search_emails(
+        self,
+        query: str,
+        max_results: int = 50,
+        require_attachments: bool = False
+    ) -> List[Dict[str, Any]]:
+        """Run an arbitrary Gmail search query and return detailed messages."""
+        if not self.service:
+            logger.error("Gmail service not initialized")
+            return []
+
+        try:
+            logger.info(f"Searching emails with query: {query}")
+            results = self.service.users().messages().list(
+                userId='me',
+                q=query,
+                maxResults=max_results
+            ).execute()
+
+            messages = results.get('messages', [])
+            logger.info(f"Found {len(messages)} messages matching query")
+
+            detailed_messages = []
+            for message in messages:
+                try:
+                    detailed_msg = await self._get_message_details_flexible(
+                        message['id'], require_attachments=require_attachments
+                    )
+                    if detailed_msg:
+                        detailed_messages.append(detailed_msg)
+                except Exception as e:
+                    logger.warning(f"Failed to get details for message {message['id']}: {e}")
+                    continue
+
+            return detailed_messages
+
+        except HttpError as e:
+            logger.error(f"Gmail API error during search: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error during search: {e}")
+            return []
+
+    async def get_emails_by_label(self, label_name: str, max_results: int = 50) -> List[Dict[str, Any]]:
+        """Get all emails carrying a given user label."""
+        return await self.search_emails(f'label:"{label_name}"', max_results=max_results)
+
+    async def ensure_label(self, label_name: str) -> Optional[str]:
+        """Return the id of a user label, creating it if it does not exist."""
+        try:
+            existing = self.service.users().labels().list(userId='me').execute()
+            for label in existing.get('labels', []):
+                if label.get('name') == label_name:
+                    return label['id']
+
+            created = self.service.users().labels().create(
+                userId='me',
+                body={
+                    'name': label_name,
+                    'labelListVisibility': 'labelShow',
+                    'messageListVisibility': 'show'
+                }
+            ).execute()
+            logger.info(f"Created Gmail label: {label_name}")
+            return created['id']
+
+        except Exception as e:
+            logger.error(f"Failed to ensure label {label_name}: {e}")
+            return None
+
+    async def add_label(self, message_id: str, label_name: str) -> bool:
+        """Add a user label to a message (creating the label if needed)."""
+        try:
+            label_id = await self.ensure_label(label_name)
+            if not label_id:
+                return False
+            self.service.users().messages().modify(
+                userId='me',
+                id=message_id,
+                body={'addLabelIds': [label_id]}
+            ).execute()
+            logger.info(f"Added label {label_name} to message {message_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add label {label_name} to {message_id}: {e}")
+            return False
+
+    async def remove_label(self, message_id: str, label_name: str) -> bool:
+        """Remove a user label from a message (no-op if the label does not exist)."""
+        try:
+            label_id = await self.ensure_label(label_name)
+            if not label_id:
+                return False
+            self.service.users().messages().modify(
+                userId='me',
+                id=message_id,
+                body={'removeLabelIds': [label_id]}
+            ).execute()
+            logger.info(f"Removed label {label_name} from message {message_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to remove label {label_name} from {message_id}: {e}")
+            return False
+
     def _build_search_query(self, since_time: datetime) -> str:
         """Build Gmail search query based on configuration."""
         query_parts = []
