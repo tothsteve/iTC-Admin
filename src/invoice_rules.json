@@ -612,6 +612,47 @@
           "Fizetési határidő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
         ]
       }
+    },
+    {
+      "name": "cleango+",
+      "email_patterns": [
+        "info@cleango.hu"
+      ],
+      "subject_patterns": [
+        "cleango+ mosásod elkészült"
+      ],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "Cleango",
+      "sheet_description": "cleango+",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "Összesen:\\s*(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF"
+        ]
+      },
+      "due_date_extraction": {
+        "pdf_patterns": [
+          "Fizetésihatáridő:\\s*(\\d{4})[.-](\\d{1,2})[.-](\\d{1,2})"
+        ]
+      }
+    },
+    {
+      "name": "Budapest Northside",
+      "email_patterns": [
+        "Budapest.Northside@regus.com"
+      ],
+      "subject_patterns": [],
+      "invoice_type": "kiadas_vallalati",
+      "payment_type": "Vállalati számla",
+      "filename_prefix": "NorthsideRegus",
+      "sheet_description": "Budapest Northside",
+      "amount_extraction": {
+        "method": "pdf",
+        "pdf_patterns": [
+          "(\\d+(?:\\s\\d{3})*(?:,\\d{2})?)\\s*HUF"
+        ]
+      }
     }
   ],
   "exclusion_rules": [
@@ -682,13 +723,13 @@
       }
     },
     "label_triggers": {
-      "ITC/Process-Vallalati": "kiadas_vallalati",
-      "ITC/Process-Penztar": "kiadas_penztár"
+      "ITC/ITC/Process-Vallalati": "kiadas_vallalati",
+      "ITC/ITC/Process-Penztar": "kiadas_penztár"
     },
     "learn_triggers": {
-      "ITC/Learn-Vallalati": "kiadas_vallalati",
-      "ITC/Learn-Penztar": "kiadas_penztár"
+      "ITC/ITC/Learn-Vallalati": "kiadas_vallalati",
+      "ITC/ITC/Learn-Penztar": "kiadas_penztár"
     },
-    "processed_label": "ITC/Processed"
+    "processed_label": "ITC/ITC/Processed"
   }
 }
