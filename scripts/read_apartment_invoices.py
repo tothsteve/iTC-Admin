@@ -125,12 +125,20 @@ def extract_due_date(text: str):
 
 
 def detect_property(text: str):
-    t = text.lower()
-    hits = [name for name, kws in PROPERTY_KEYWORDS.items() if any(k in t for k in kws)]
-    if len(hits) == 1:
-        return hits[0]
-    if len(hits) > 1:
-        return '+'.join(hits) + ' (?)'
+    # The CONSUMPTION address ("felhasználási hely") decides the property, NOT the
+    # billing/customer address. MVM bills list both — e.g. customer at Zágrábi utca
+    # but the metered usage point at Somfa utca — so matching the whole text would
+    # mis-detect. Match the usage-point lines first; fall back to the full text.
+    usage = '\n'.join(ln for ln in text.split('\n')
+                      if re.search(r'felhaszn[aá]l[aá]si\s+hely', ln, re.I))
+    for scope in (usage.lower(), text.lower()):
+        if not scope:
+            continue
+        hits = [name for name, kws in PROPERTY_KEYWORDS.items() if any(k in scope for k in kws)]
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            return '+'.join(hits) + ' (?)'
     return DEFAULT_PROPERTY
 
 
@@ -161,7 +169,9 @@ def extract_pdf_text(data: bytes) -> str:
         tmp.unlink()
     except Exception:
         pass
-    return text
+    # MVM PDFs embed UTF-16 runs that PyPDF2 leaves as NUL bytes interspersed
+    # between characters, breaking substring matches (e.g. "S\x00o\x00m\x00f\x00a").
+    return text.replace('\x00', '')
 
 
 async def build_apartment_client() -> GmailClient:
